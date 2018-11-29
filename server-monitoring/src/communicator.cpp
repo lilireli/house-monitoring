@@ -8,6 +8,16 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <thread>
+#include <map>
+
+std::map<std::string, std::string> errors = {
+    {"ok",              "{\"OK\":\"\"}"},
+    {"tempLow",         "{\"KO\":\"Temperature too low\"}"},
+    {"errArduino",      "{\"KO\":\"Internal sensor problem\"}" },
+    {"errRaspberry",    "{\"KO\":\"Internal transmitter problem\"}" },
+    {"errWebserver",    "{\"KO\":\"Internal webserver problem\"}" }
+};
 
 void insert_db(std::string timestamp, float temperature)
 {
@@ -43,12 +53,12 @@ void insert_db(std::string timestamp, float temperature)
     sqlite3_close(db);
 }
 
-int main (int argc, char *argv[]) 
+void communicate_sensor()
 {
     // Prepare our context and socket
     zmq::context_t context (1);
     zmq::socket_t socket (context, ZMQ_REP);
-    socket.bind ("tcp://*:5555");    
+    socket.bind ("tcp://*:5555"); 
 
     while (true) {
         //  Wait for next request from client
@@ -69,11 +79,44 @@ int main (int argc, char *argv[])
         zmq::message_t reply (5);
         memcpy (reply.data (), "World", 5);
         socket.send (reply);
+
+        // mechanism to empty table every once or so
     }
+}
 
-    
+void communicate_webserver()
+{
+    std::string state = errors["ok"];
 
-   
+    // Prepare our context and socket
+    zmq::context_t context (1);
+    zmq::socket_t socket (context, ZMQ_REP);
+    socket.bind ("tcp://*:5556"); 
+
+    while (true) {
+        //  Wait for next request from client
+        zmq::message_t request;
+        std::string state_server;
+        
+        socket.recv(&request);
+        std::istringstream iss(static_cast<char*>(request.data()));
+        iss >> state_server ;
+        std::cout << "Received from webserver " << state_server << std::endl;
+
+        //  Send reply back to client
+        zmq::message_t reply (20);
+        memcpy(reply.data (), state.c_str(), 20);
+        socket.send (reply);
+    }
+}
+
+int main (int argc, char *argv[]) 
+{
+    std::thread thread_sensor(communicate_sensor);
+    std::thread thread_webserver(communicate_webserver);
+
+    thread_sensor.join();
+    thread_webserver.join();
 
     return 0;
 }

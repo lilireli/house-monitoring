@@ -1,28 +1,10 @@
-#include "client_http.hpp"
-#include "server_http.hpp"
+#include "webserver.hpp"
 
-// Added for the json-example
-#define BOOST_SPIRIT_THREADSAFE
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-
-// Added for the default_resource example
-#include <algorithm>
-#include <boost/filesystem.hpp>
-#include <sqlite3.h> 
-#include <fstream>
-#include <vector>
-#include <iomanip>
-#ifdef HAVE_OPENSSL
-#include "crypto.hpp"
-#endif
-
-using namespace std;
+using namespace std; // TODO: remove it !
 // Added for the json-example:
 using namespace boost::property_tree;
 
-using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
-using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
+std::string Logger::m_state = "ok";
 
 std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols)
 {
@@ -31,32 +13,34 @@ std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols)
     std::vector<std::vector<std::string>> result;
     
     int exit = 0; 
-    exit = sqlite3_open("test.db", &db); 
+    exit = sqlite3_open(DATABASE, &db);
 
     if (exit)
     {
-        fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+        Logger() << "Can't open database: " << sqlite3_errmsg(db);
+        Logger().setState("webserver");
     }
     else
-    {
-        fprintf(stderr, "Opened database successfully\n");
-        char* messaggeError; 
-        
-        sqlite3_prepare( db, query.c_str(), -1, &stmt, NULL ); //preparing the statement
+    {     
+        sqlite3_prepare( db, query.c_str(), -1, &stmt, NULL ); 
         sqlite3_step( stmt ); //executing the statement
 
         for( int i = 0; i < nb_cols; i++ )
             result.push_back(std::vector< std::string >());
 
-        while( sqlite3_column_text( stmt, 0 ) )
+        if (!sqlite3_column_text(stmt, 0))
         {
-            for( int i = 0; i < nb_cols; i++ )
-                result[i].push_back( std::string( (char *)sqlite3_column_text( stmt, i ) ) );
+            Logger() << "Query did not match any data";
+            throw std::invalid_argument("query did not match any data");
+        }
+
+        while(sqlite3_column_text(stmt, 0))
+        {
+            for(int i = 0; i < nb_cols; i++)
+                result[i].push_back(std::string((char *)sqlite3_column_text(stmt, i)));
             sqlite3_step( stmt );
         }
     }
-
-    std::cout << "exit" << std::endl;
     
     sqlite3_finalize(stmt);
     sqlite3_close(db);
@@ -64,18 +48,36 @@ std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols)
     return result;
 }
 
-stringstream get_kpi_temp(float currentTemp)
+stringstream get_kpi_temp()
 {
     stringstream stream;
 
     std::string query = "select min(temperature_celsius), max(temperature_celsius) from temperature_serre where received_time > date('now','-1 day');";
-    // TODO: add where on 24h
 
-    auto result = query_db(query, 2);
+    float minTemp = -99;
+    float maxTemp = -99;
+    float currentTemp = -99;
 
-    // TODO: handle error
-    float minTemp = std::stof(result[0][0].c_str());
-    float maxTemp = std::stof(result[1][0].c_str());
+    try {
+        auto result = query_db(query, 2);
+        minTemp = std::stof(result[0][0].c_str());
+        maxTemp = std::stof(result[1][0].c_str());
+    }
+    catch (int e) {
+        Logger() << "Error while retrieving temperatures min max";
+        Logger().setState("webserver");
+    }
+
+    query = "select temperature_celsius from temperature_serre where datetime(received_time) > datetime('now', '-10 minute', 'localtime') order by received_time desc limit 1;";
+
+    try {
+        auto result = query_db(query, 1);
+        currentTemp = std::stof(result[0][0].c_str());
+    }
+    catch (int e) {
+        Logger() << "Error while retrieving current temperature";
+        Logger().setState("webserver");
+    }
 
     stream << std::fixed << std::setw(2) << std::setprecision(2)
            << "{\"currentTemp\":" << currentTemp 
@@ -87,27 +89,29 @@ stringstream get_kpi_temp(float currentTemp)
 
 stringstream get_graph_temp()
 {
-    stringstream stream;
+    std::stringstream stream;
 
     std::string query = "select datetime(strftime('%s', received_time) / 3600 * 3600, 'unixepoch', 'localtime'), avg(temperature_celsius) from temperature_serre where received_time > date('now', '-7 day') group by 1 order by received_time asc;";
-    // TODO: add where 7j, TODO: add agg 7days
-
-    auto result = query_db(query, 2);
-
-    // TODO: handle error no rep
 
     stream << "{\"temps\":[";
 
-    for (size_t i = 0; i < result[0].size(); ++i)
-    {
-        if(i != 0)
-            stream << ",";
+    try {
+        auto result = query_db(query, 2);    
 
-        stream << std::fixed << std::setw(2) << std::setprecision(2)
-               << "{\"time\": \"" << result[0][i] << "\""
-               << ", \"temp\":" << std::stof(result[1][i].c_str()) << "}";
+        for (size_t i = 0; i < result[0].size(); ++i)
+        {
+            if(i != 0) stream << ",";
+
+            stream << std::fixed << std::setw(2) << std::setprecision(2)
+                   << "{\"time\": \"" << result[0][i] << "\""
+                   << ", \"temp\":" << std::stof(result[1][i].c_str()) << "}";
+        }
     }
-    
+    catch (int e) {
+        Logger() << "Error while retrieving temperature graph";
+        Logger().setState("webserver");
+    }
+
     stream << "]}";
 
     return stream;
@@ -116,63 +120,54 @@ stringstream get_graph_temp()
 stringstream get_alarm_status()
 {
     stringstream stream;
-    stream << "{\"status\":\"KO\", \"desc\":\"Température trop basse\"}";
+    stream << "{\"status\":\"" << Logger().getState() << "\"}";
     return stream;
 }
 
-int main()
+void Server::start()
 {
-    // HTTP-server at port 8080 using 1 thread
+    // HTTP-server at port PORT using 1 thread
     // Unless you do more heavy non-threaded processing in the resources,
     // 1 thread is usually faster than several threads
-    HttpServer server;
-    server.config.port = 8080;
+    m_server.config.port = PORT;
 
-    float currentTemp = 3.26;
+    Logger() << "Server started on port " << m_server.config.port;
 
-    server.resource["^/kpi-temp$"]["GET"] = [currentTemp]
+    m_server.resource["^/kpi-temp$"]["GET"] = []
         (shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) 
     {
-        std::cout << "bla" << std::endl;
-        stringstream stream = get_kpi_temp(currentTemp);
+        stringstream stream = get_kpi_temp();
         response->write(stream);
     };
 
-    server.resource["^/graph-temp$"]["GET"] = []
+    m_server.resource["^/graph-temp$"]["GET"] = []
         (shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) 
     {
-        std::cout << "bla" << std::endl;
         stringstream stream = get_graph_temp();
-        std::cout << "bla2" << std::endl;
         response->write(stream);
-        std::cout << "bla3" << std::endl;
     };
 
-    server.resource["^/alert$"]["GET"] = []
+    m_server.resource["^/alert$"]["GET"] = []
         (shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) 
     {
-        std::cout << "bla" << std::endl;
         stringstream stream = get_alarm_status();
         response->write(stream);
     };
 
-    server.resource["^/buzzer$"]["GET"] = []
+    m_server.resource["^/buzzer$"]["GET"] = []
         (shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) 
     {
         stringstream stream;
-        std::cout << "bla" << std::endl;
-
         stream << "{\"status\":\"activated\"}";
-
         response->write(stream);
     };
 
-    server.resource["^/buzzer$"]["POST"] = []
+    m_server.resource["^/buzzer$"]["POST"] = []
         (shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) 
     {
         auto content = request->content.string();
 
-        std::cout << content << std::endl;
+        Logger() << content;
 
         *response << "HTTP/1.1 200 OK\r\nContent-Length: " << content.length() << "\r\n\r\n"
                   << content;
@@ -182,7 +177,7 @@ int main()
     // Will respond with content in the web/-directory, and its subdirectories.
     // Default file: index.html
     // Can for instance be used to retrieve an HTML 5 client that uses REST-resources on this server
-    server.default_resource["GET"] = [](shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
+    m_server.default_resource["GET"] = [](shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
         try
         {
             auto web_root_path = boost::filesystem::canonical("web");
@@ -242,17 +237,52 @@ int main()
         }
     };
 
-    server.on_error = [](shared_ptr<HttpServer::Request> /*request*/, const SimpleWeb::error_code & /*ec*/) {
+    m_server.on_error = [](shared_ptr<HttpServer::Request> /*request*/, const SimpleWeb::error_code & /*ec*/) {
         // Handle errors here
         // Note that connection timeouts will also call this handle with ec set to SimpleWeb::errc::operation_canceled
     };
 
-    thread server_thread([&server]() {
+    m_server_thread = std::make_shared<std::thread>(std::thread([this]() {
         // Start server
-        server.start();
-    });
+        m_server.start();
+    }));
+}
 
-    // std::cout << "Server started on port " << server.config.port << std::endl;
+void Server::stop()
+{
+    m_server_thread->join();
+}
 
-    server_thread.join();
+int main()
+{
+    Server server;
+    zmq::context_t context (1);
+    zmq::socket_t socket (context, ZMQ_REQ);
+
+    Logger() << "Starting webserver at port " << PORT;
+    server.start();
+
+    Logger() << "Connecting to communicator at port 5556…";
+    socket.connect ("tcp://localhost:5556");
+
+    while (true) {
+        // Send message
+        zmq::message_t request(20);
+        snprintf ((char *) request.data(), 20 , "How are you");
+        socket.send (request);
+
+        //  Get the reply.
+        zmq::message_t reply;
+        socket.recv (&reply);
+        Logger() << "Received " << reply.data();
+
+        // set state with reply from server
+        Logger().setState("ok");
+
+        std::this_thread::sleep_for(std::chrono::minutes(1));
+    }
+
+    server.stop();
+
+    return 0;
 }
