@@ -263,7 +263,7 @@ int main()
     server.start();
 
     Logger() << "Connecting to communicator at port 5556…";
-    socket.connect ("tcp://localhost:5556");
+    socket.connect ("tcp://house-monitoring-communicator:5556");
 
     while (true) {
         // Send message
