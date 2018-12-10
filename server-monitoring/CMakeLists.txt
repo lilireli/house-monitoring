@@ -12,7 +12,7 @@ add_compile_options(-Wall -Wextra -Wsign-conversion)
 
 # target_link_libraries(server pistache)
 
-include_directories("lib/Simple-Web-Server")
+include_directories("lib/simple-web-server")
 include_directories("include")
 
 add_executable(zmq_client
