@@ -38,7 +38,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(simple-web-server INTERFACE ${CMAKE_THREAD_LIBS_INIT})
 
 
-find_package(Boost 1.53.0 COMPONENTS system thread filesystem REQUIRED)
+find_package(Boost 1.53.0 COMPONENTS system thread filesystem program_options REQUIRED)
 
 target_link_libraries(simple-web-server INTERFACE ${Boost_LIBRARIES})
 target_include_directories(simple-web-server INTERFACE ${Boost_INCLUDE_DIR})

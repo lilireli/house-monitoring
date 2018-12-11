@@ -1,30 +1,26 @@
 #pragma once
 
-#include "client_http.hpp"
-#include "server_http.hpp"
-#include <zmq.hpp>
+#define BOOST_SPIRIT_THREADSAFE
+
 #include <string>
 #include <iostream>
-#include <thread>
-
-// Added for the json-example
-#define BOOST_SPIRIT_THREADSAFE
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-
-// Added for the default_resource example
-#include <algorithm>
-#include <boost/filesystem.hpp>
-#include <sqlite3.h> 
+#include <sstream>
 #include <fstream>
 #include <vector>
+#include <map>
+#include <thread>
+#include <algorithm>
 #include <iomanip>
-#ifdef HAVE_OPENSSL
-#include "crypto.hpp"
-#endif
+#include <boost/filesystem.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/program_options.hpp>
+#include <sqlite3.h> 
+#include <zmq.hpp>
 
-#define DATABASE "test.db"
-#define PORT 8080
+// For the webserver
+#include "client_http.hpp"
+#include "server_http.hpp"
 
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
@@ -38,6 +34,33 @@ std::stringstream get_graph_temp();
 
 // ZMQ functions and alarm
 std::stringstream get_alarm_status();
+
+// Config
+class Config
+{
+  public:
+    Config(std::string config_file);
+
+    int getWebserverPort()
+    {
+        return m_webserver_port;
+    }
+
+    int getZmqPort()
+    {
+        return m_zmq_port;
+    }
+
+    std::string getDbPath()
+    {
+        return m_db_path;
+    }
+
+  private:
+    int m_webserver_port;
+    int m_zmq_port;
+    std::string m_db_path;
+};
 
 // Logger
 // the logger will now how to output data
@@ -68,11 +91,30 @@ class Logger
     static std::string m_state;
 };
 
+// Database functions
+class Database
+{
+  public:
+    Database(){}
+
+    void init(std::string db_path)
+    {
+        m_db_path = db_path;
+    }
+
+    std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols);
+
+    void insert_db(std::string timestamp, float temperature);
+
+  private:
+    static std::string m_db_path;
+};
+
 // Server functions
 class Server
 {
   public:
-    void start();
+    void start(int port);
     void stop();
 
   private:

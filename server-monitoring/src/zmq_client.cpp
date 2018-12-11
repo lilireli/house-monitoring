@@ -22,7 +22,7 @@ int main (int argc, char *argv[])
     
 
     std::cout << "Connecting to hello world server…" << std::endl;
-    socket.connect ("tcp://localhost:5555");
+    socket.connect ("tcp://localhost:8001");
 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));

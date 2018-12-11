@@ -2,18 +2,38 @@
 
 using namespace std; // TODO: remove it !
 // Added for the json-example:
-using namespace boost::property_tree;
+namespace pt = boost::property_tree;
+namespace po = boost::program_options;
+
+std::map<std::string, std::string> errors = {
+    {"ok",              "{\"OK\":\"\"}"},
+    {"tempLow",         "{\"KO\":\"Temperature too low\"}"},
+    {"errArduino",      "{\"KO\":\"Internal sensor problem\"}" },
+    {"errRaspberry",    "{\"KO\":\"Internal transmitter problem\"}" },
+    {"errWebserver",    "{\"KO\":\"Internal webserver problem\"}" }
+};
 
 std::string Logger::m_state = "ok";
+std::string Database::m_db_path = "";
 
-std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols)
+Config::Config(std::string config_file)
+{
+    pt::ptree root;
+    
+    pt::read_json(config_file, root);
+    m_webserver_port = root.get<int>("webserver_port", 0);
+    m_zmq_port = root.get<int>("zmq_port", 0);
+    m_db_path = root.get<std::string>("database");
+}
+
+std::vector<std::vector<std::string>> Database::query_db(std::string query, int nb_cols)
 {
     sqlite3 *db;
     sqlite3_stmt * stmt;
     std::vector<std::vector<std::string>> result;
     
     int exit = 0; 
-    exit = sqlite3_open(DATABASE, &db);
+    exit = sqlite3_open(m_db_path.c_str(), &db);
 
     if (exit)
     {
@@ -48,6 +68,40 @@ std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols)
     return result;
 }
 
+void Database::insert_db(std::string timestamp, float temperature)
+{
+    sqlite3 *db;
+    std::string sqlstatement =
+        "INSERT INTO temperature_serre(received_time, temperature_celsius) VALUES ('"
+        + timestamp + "',"
+        + std::to_string(temperature) + ");";
+
+    std::cout << sqlstatement << std::endl;
+    
+    int exit = 0; 
+    exit = sqlite3_open(m_db_path.c_str(), &db); 
+
+    if (exit)
+    {
+        std::cout << "Can't open database: " << sqlite3_errmsg(db) << std::endl;
+    }
+    else
+    {
+        char* messaggeError; 
+        exit = sqlite3_exec(db, sqlstatement.c_str(), NULL, 0, &messaggeError); 
+    
+        if (exit != SQLITE_OK) { 
+            std::cerr << "Error Insert Into Table:" 
+                      <<  messaggeError << std::endl;
+            sqlite3_free(messaggeError); 
+        } 
+        else
+            std::cout << "Insert into table successful" << std::endl; 
+    }
+    
+    sqlite3_close(db);
+}
+
 stringstream get_kpi_temp()
 {
     stringstream stream;
@@ -59,7 +113,7 @@ stringstream get_kpi_temp()
     float currentTemp = -99;
 
     try {
-        auto result = query_db(query, 2);
+        auto result = Database().query_db(query, 2);
         minTemp = std::stof(result[0][0].c_str());
         maxTemp = std::stof(result[1][0].c_str());
     }
@@ -71,7 +125,7 @@ stringstream get_kpi_temp()
     query = "select temperature_celsius from temperature_serre where datetime(received_time) > datetime('now', '-10 minute', 'localtime') order by received_time desc limit 1;";
 
     try {
-        auto result = query_db(query, 1);
+        auto result = Database().query_db(query, 1);
         currentTemp = std::stof(result[0][0].c_str());
     }
     catch (int e) {
@@ -96,7 +150,7 @@ stringstream get_graph_temp()
     stream << "{\"temps\":[";
 
     try {
-        auto result = query_db(query, 2);    
+        auto result = Database().query_db(query, 2);    
 
         for (size_t i = 0; i < result[0].size(); ++i)
         {
@@ -124,12 +178,12 @@ stringstream get_alarm_status()
     return stream;
 }
 
-void Server::start()
+void Server::start(int port)
 {
     // HTTP-server at port PORT using 1 thread
     // Unless you do more heavy non-threaded processing in the resources,
     // 1 thread is usually faster than several threads
-    m_server.config.port = PORT;
+    m_server.config.port = port;
 
     Logger() << "Server started on port " << m_server.config.port;
 
@@ -253,35 +307,79 @@ void Server::stop()
     m_server_thread->join();
 }
 
-int main()
+void communicate_sensor(int port)
 {
-    Server server;
+    // Prepare our context and socket
     zmq::context_t context (1);
-    zmq::socket_t socket (context, ZMQ_REQ);
-
-    Logger() << "Starting webserver at port " << PORT;
-    server.start();
-
-    Logger() << "Connecting to communicator at port 5556…";
-    socket.connect ("tcp://house-monitoring-communicator:5556");
+    zmq::socket_t socket (context, ZMQ_REP);
+    socket.bind ("tcp://*:" + std::to_string(port));
 
     while (true) {
-        // Send message
-        zmq::message_t request(20);
-        snprintf ((char *) request.data(), 20 , "How are you");
-        socket.send (request);
+        //  Wait for next request from client
+        zmq::message_t request;
+        float temperature;
+        std::string timestamp;
 
-        //  Get the reply.
-        zmq::message_t reply;
-        socket.recv (&reply);
-        Logger() << "Received " << reply.data();
+        socket.recv(&request);
 
-        // set state with reply from server
-        Logger().setState("ok");
+        std::istringstream iss(static_cast<char*>(request.data()));
+        iss >> timestamp >> temperature ;
+        // TODO: add alarm state
+        std::cout << "Received at " << timestamp 
+                  << " temp is " << temperature << std::endl;
 
-        std::this_thread::sleep_for(std::chrono::minutes(1));
+        Database().insert_db(timestamp, temperature);
+
+        //  Send reply back to client
+        zmq::message_t reply (5);
+        memcpy (reply.data (), "World", 5);
+        socket.send (reply);
+
+        // mechanism to empty table every once or so
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    std::string config_file = "";
+
+    po::options_description desc("Webserver for house-monitoring project");
+    desc.add_options()
+        ("help,h", "produce help message")
+        ("config,c", po::value<std::string>(), "defines config file to use")
+    ;
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);    
+
+    if (vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 1;
     }
 
+    if (vm.count("config")) {
+        config_file = vm["config"].as<std::string>();
+    } else {
+        std::cout << "No configuration file was provided." << std::endl;
+        return 1;
+    }
+
+    Config conf(config_file);
+    
+    Database().init(conf.getDbPath());
+
+    std::cout << conf.getWebserverPort() << std::endl;
+
+    Server server;
+
+    Logger() << "Starting webserver at port " << conf.getWebserverPort();
+    server.start(conf.getWebserverPort());
+
+    Logger() << "Starting sensor listener at port " << conf.getZmqPort();
+    std::thread thread_sensor(communicate_sensor, conf.getZmqPort());
+
+    thread_sensor.join();
     server.stop();
 
     return 0;
