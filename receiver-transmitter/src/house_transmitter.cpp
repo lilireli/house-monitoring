@@ -1,8 +1,18 @@
-#include <receiver_transmitter.h>
-#include <iostream>
-#include <string>
-#include <iomanip>
-#include <csignal>
+// Raspberry transmitter to retrieve the temperature through LoRa and resend it through Zmq
+
+// Dragino Lora SPI Pins
+///                 Raspberry    RFM95/96/97/98
+///                 GND----------GND   (ground in)
+///                 3V3----------3.3V  (3.3V in)
+///  interrupt 0 pin 24----------DIO0  (interrupt request out)
+///           SS pin 26----------NSS   (chip select in)
+///          SCK pin 23----------SCK   (SPI clock in)
+///         MOSI pin 19----------MOSI  (SPI Data in)
+///         MISO pin 21----------MISO  (SPI Data out)
+
+#include <house_transmitter.h>
+
+namespace po = boost::program_options;
 
 // Create an instance of a driver
 RH_RF95 rf95(RF_CS_PIN);
@@ -88,7 +98,7 @@ int check_temp(float temp)
     if(temp < TRIGGER_TEMP)
     {
         digitalWrite(LED_GREEN, LOW);
-        digitalWrite(buzzer, HIGH);
+        // digitalWrite(buzzer, HIGH);
         return 1;
     }
     else
@@ -101,10 +111,42 @@ int check_temp(float temp)
 //Main Function
 int main(int argc, const char *argv[])
 {
+    std::string url;
+
+    po::options_description desc("Transmitter for house-monitoring project");
+    desc.add_options()
+        ("help,h", "produce help message")
+        ("url", po::value<std::string>(), "defines to which url send the data")
+    ;
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);    
+
+    if (vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 1;
+    }
+
+    if (vm.count("url")) {
+        url = vm["url"].as<std::string>();
+    } else {
+        std::cout << "No url was provided." << std::endl;
+        return 1;
+    }
+
     setup();
 
+    // Prepare LCD screen
     LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
     lcd.begin(16, 2);
+
+    //  Prepare our context and socket
+    zmq::context_t context (1);
+    zmq::socket_t socket (context, ZMQ_REQ);
+
+    std::cout << "Connecting to server at address " << url << std::endl;
+    socket.connect (url);
 
     lcd.print("Temperature:     ");
     lcd.setCursor(0, 1);
@@ -118,21 +160,35 @@ int main(int argc, const char *argv[])
             uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
             uint8_t len = sizeof(buf);
 
-            // Timeout if no data received -> raspberry is down -> alert
+            // Timeout if no data received -> arduino is down -> alert
             if (rf95.recv(buf, &len))
             {
                 std::cout << "Data: " << (char *)buf << std::endl;
                 float temp = std::stof((char *)buf);
 
-                // Send a reply to client as ACK
-                uint8_t data[] = "200 OK";
-                rf95.send(data, sizeof(data));
-                rf95.waitPacketSent();
-
                 lcd.setCursor(0, 1);
                 lcd.print((char*)buf);
 
                 int alarm = check_temp(temp);
+
+                // check datetime
+                time_t now = time(0);
+                struct tm * timeinfo = localtime(&now);
+                char buffer[30];
+
+                strftime(buffer,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
+
+                std::cout << "The local date and time is: " << buffer << std::endl;
+
+                //  Send message to all subscribers
+                zmq::message_t request(40);
+                snprintf((char *) request.data(), 40, "%s %2.2f", buffer, temp);
+                socket.send (request);
+
+                //  Get the reply.
+                zmq::message_t reply;
+                socket.recv (&reply);
+                std::cout << "Received " << reply.data() << std::endl;
 
                 // TODO: send data to server with alarm status
                 // TODO: add sound of alarm

@@ -1,10 +1,17 @@
 #pragma once
 
+#include <iostream>
+#include <string>
+#include <iomanip>
+#include <csignal>
+
 #include <bcm2835.h> // Includes for PINs
 #include <RasPi.h> // Includes for PINs
 #include <RH_RF69.h> // Lora transmitter
 #include <RH_RF95.h> // Lora transmitter
 #include "LiquidCrystal.h" // LCD screen
+#include <zmq.hpp>
+#include <boost/program_options.hpp>
 
 // Those numbers are the one of the pins of Raspberry (without any conversion)
 #define RF_CS_PIN  RPI_V2_GPIO_P1_26 // Slave Select on GPIO25 so P1 connector pin #22
