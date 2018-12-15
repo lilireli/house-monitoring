@@ -11,7 +11,8 @@ include_directories(${RADIOHEADBASE})
 include_directories(${RADIOHEADBASE}/RHutil)
 include_directories(${LIQUIDCRYSTALBASE})
 
-find_package(Boost 1.61.0 COMPONENTS system program_options REQUIRED)
+find_package(Threads REQUIRED)
+find_package(Boost 1.61.0 COMPONENTS system thread program_options REQUIRED)
 
 add_executable(house_transmitter 
     ${RADIOHEADBASE}/RHutil/RasPi.cpp
