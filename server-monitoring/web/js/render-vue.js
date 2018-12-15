@@ -93,17 +93,27 @@ var alert = new Vue({
     },
     methods: {
         interpret: function (response) {
-            if (response.data.status == "KO") {
-                this.alertMsg = 'Alerte en cours: ' + response.data.desc;
-                this.icon['fa-comment'] = true;
-                this.color['w3-red'] = true;
-                this.color['w3-light-grey'] = false;
-            }
-            else {
+            if (response.data.status == "ok") {
                 this.alertMsg = '';
                 this.icon['fa-comment'] = false;
                 this.color['w3-red'] = false;
                 this.color['w3-light-grey'] = true;
+            }
+            else {
+                alert = "";
+
+                switch (response.data.status){
+                    case "tempLow": alert = "La température dans la serre est trop basse"; break;
+                    case "errArduino": alert = "Le capteur dans la serre ne fonctionne plus"; break;
+                    case "errRaspberry": alert = "Le transmetteur de température ne fonctionne pas"; break;
+                    case "errWebserver": alert = "Une erreur interne est survenue sur le serveur web"; break;
+
+                }
+
+                this.alertMsg = 'Alerte en cours: ' + alert;
+                this.icon['fa-comment'] = true;
+                this.color['w3-red'] = true;
+                this.color['w3-light-grey'] = false;
             }
         },
         loadData: function () {

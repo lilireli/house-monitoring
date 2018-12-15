@@ -25,15 +25,13 @@
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
 
-// SQL functions
-std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols);
-
-std::stringstream get_kpi_temp();
-
-std::stringstream get_graph_temp();
-
-// ZMQ functions and alarm
-std::stringstream get_alarm_status();
+enum class Error {
+    OK,
+    TEMPLOW,
+    ERRARDUINO,
+    ERRRASPBERRY,
+    ERRWEBSERVER
+};
 
 // Config
 class Config
@@ -70,14 +68,24 @@ class Logger
   public:
     Logger(){}
 
-    std::string getState() const
+    Error getState() const
     {
         return m_state;
     }
 
-    static void setState(std::string new_state)
+    static void setState(Error state)
     {
-        m_state = new_state;
+        m_state = state;
+    }
+
+    bool getAlarmEnabled() const
+    {
+        return m_alarm_enabled;
+    }
+
+    static void setAlarmEnabled(bool alarm_enabled)
+    {
+        m_alarm_enabled = alarm_enabled;
     }
 
     template< typename T >
@@ -88,7 +96,8 @@ class Logger
     }
 
   private:
-    static std::string m_state;
+    static Error m_state;
+    static bool m_alarm_enabled;
 };
 
 // Database functions
@@ -102,9 +111,11 @@ class Database
         m_db_path = db_path;
     }
 
-    std::vector<std::vector<std::string>> query_db(std::string query, int nb_cols);
+    std::vector<std::vector<std::string>> query_db(std::string query, uint nb_cols);
 
     void insert_db(std::string timestamp, float temperature);
+
+    void empty_table();
 
   private:
     static std::string m_db_path;
@@ -114,10 +125,32 @@ class Database
 class Server
 {
   public:
-    void start(int port);
+    Server(int port);
+    std::stringstream get_kpi_temp();
+    std::stringstream get_graph_temp();
+    std::stringstream get_alarm_status();
+    std::stringstream get_alarm_enabled();
+    void set_alarm_enabled(std::string content);
+    void start();
     void stop();
 
   private:
     HttpServer m_server;
-    std::shared_ptr<std::thread> m_server_thread;
+    std::unique_ptr<std::thread> m_server_thread;
+};
+
+class ZmqReceiver
+{
+  public:
+    ZmqReceiver(int port);
+    void initialize_socket();
+    void communicate();
+    void start();
+    void stop();
+
+  private:
+    zmq::context_t m_context;
+    std::unique_ptr<zmq::socket_t> m_socket;
+    int m_port;
+    std::unique_ptr<std::thread> m_zmq_thread;
 };
