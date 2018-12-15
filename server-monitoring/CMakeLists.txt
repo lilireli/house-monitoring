@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(Server_Serre)
+project(Webserver-House-Monitoring)
 
 # set(CMAKE_CXX_STANDARD 17)
 

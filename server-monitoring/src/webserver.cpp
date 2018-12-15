@@ -335,7 +335,7 @@ void communicate_sensor(int port)
         memcpy (reply.data (), "World", 5);
         socket.send (reply);
 
-        // mechanism to empty table every once or so
+        // TODO: mechanism to empty table every once or so
     }
 }
 
