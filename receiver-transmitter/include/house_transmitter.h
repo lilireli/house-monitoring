@@ -4,6 +4,8 @@
 #include <string>
 #include <iomanip>
 #include <csignal>
+#include <thread>
+#include <chrono>
 
 #include <bcm2835.h> // Includes for PINs
 #include <RasPi.h> // Includes for PINs
@@ -32,12 +34,65 @@
 #define RF_FREQUENCY  868.00
 #define RF_NODE_ID    1
 
-#define TRIGGER_TEMP    23 // in degrees
+#define TRIGGER_TEMP    5 // in degrees
+
+class InfoScreen
+{
+  public:
+    InfoScreen();
+    void print_line_one(std::string text);
+    void print_line_two(std::string text);
+
+  private:
+    LiquidCrystal m_lcd;
+};
+
+class IHM
+{
+  public:
+    IHM();
+    ~IHM();
+
+    void start_alarm(std::string error_msg);
+    void stop_alarm();
+    int print_temp(float temp);
+    void no_temp();
+    void set_alarm_enabled(bool enable);
+    void make_noise();
+
+  private:
+    InfoScreen m_info_screen;
+    std::shared_ptr<std::thread> m_alarm_thread;
+    bool m_alarm_enabled;
+    bool m_alarm_running;
+};
+
+class LoraReceiver
+{
+  public:
+    LoraReceiver();
+    ~LoraReceiver();
+
+    int recv(float* temp);
+
+  private:
+    RH_RF95 m_rf95;
+};
+
+class ZmqSender
+{
+  public:
+    ZmqSender(std::string url);
+
+    void initialize_socket();
+    int send(float temp, int alarm);
+    int receive(std::string response);
+
+  private:
+    zmq::context_t m_context;
+    std::unique_ptr<zmq::socket_t> m_socket;
+    std::string m_url;
+};
 
 // Handling Ctrl-C interrupt
 void sig_handler(int sig);
-
-void setup();
-void teardown();
-
-int check_temp(float temp);
