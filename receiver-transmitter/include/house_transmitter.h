@@ -62,7 +62,7 @@ class IHM
 
   private:
     InfoScreen m_info_screen;
-    std::shared_ptr<std::thread> m_alarm_thread;
+    std::unique_ptr<std::thread> m_alarm_thread;
     bool m_alarm_enabled;
     bool m_alarm_running;
 };
