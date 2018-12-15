@@ -70,7 +70,7 @@ void IHM::start_alarm(std::string error_msg)
 
     if (!m_alarm_running && m_alarm_enabled){
         m_alarm_running = true;
-        m_alarm_thread = std::make_shared<std::thread>(std::thread([this]() {
+        m_alarm_thread = std::make_unique<std::thread>(std::thread([this]() {
             make_noise();
         }));
     }
