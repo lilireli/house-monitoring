@@ -418,42 +418,49 @@ void ZmqReceiver::communicate()
         zmq::message_t request;
 
         m_socket->recv(&request);
+        
+        // We need to remove unuseful characters at the end of the string
+        std::string req_corrupt = std::string(static_cast<char*>(request.data()), request.size());
+        std::size_t req_corrupt_end = req_corrupt.find("}");
+        
+        if (req_corrupt_end == std::string::npos)
+        {
+            Logger() << "Received badly formatted message";
+            Logger().setState(Error::ERRRASPBERRY);
+            return;
+        }
 
-        std::stringstream req;
-        req << std::string(static_cast<char*>(request.data()), request.size());
-
+        std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
         pt::ptree root;
+
+        Logger() << req.str();
     
         pt::read_json(req, root);
-        std::string timestamp = root.get<std::string>("datetime", 0);
-        float temperature = root.get<float>("temperature", 0);
+        std::string timestamp = root.get<std::string>("datetime");
+        float temperature = root.get<float>("temperature");
         std::string alarm_current = root.get<std::string>("alarm_current");
-        bool alarm_enabled = root.get<int>("alarm_enabled");
 
-        // std::cout << req;
+        if (alarm_current != "errArduino"){
+            Database().insert_db(timestamp, temperature);
+        }
 
-        Database().insert_db(timestamp, temperature);
-        Logger().setAlarmEnabled(alarm_enabled);
-
-        if (alarm_current != "ok")
+        if (alarm_current == "tempLow")
         {
-            if (alarm_current == "templow")
-            {
-                Logger().setState(Error::TEMPLOW);
-            }
-            else if (alarm_current == "errarduino")
-            {
-                Logger().setState(Error::ERRARDUINO);
-            }
+            Logger().setState(Error::TEMPLOW);
+        }
+        else if (alarm_current == "errArduino")
+        {
+            Logger().setState(Error::ERRARDUINO);
+        }
+        else
+        {
+            Logger().setState(Error::OK);
         }
         
-
         //  Send reply back to client
         zmq::message_t reply (5);
-        memcpy (reply.data (), "World", 5);
+        snprintf((char *)reply.data (), 5, "%d", Logger().getAlarmEnabled());
         m_socket->send (reply);
-
-        // TODO: mechanism to empty table every once or so
     }
 }
 
