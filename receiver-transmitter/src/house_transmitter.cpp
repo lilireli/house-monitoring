@@ -200,7 +200,6 @@ int LoraReceiver::recv(float* temp)
                 }
                 catch (...) {
                     std::cout << "No temperature received from sensor" << std::endl;
-                    return -1;
                 }
             }
         }
