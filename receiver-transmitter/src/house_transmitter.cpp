@@ -37,7 +37,7 @@ void InfoScreen::print_line_two(std::string text)
 }
 
 //// IHM ////
-IHM::IHM(): m_alarm_enabled(true), m_alarm_running(false)
+IHM::IHM(): m_alarm_enabled(false), m_alarm_running(false)
 {
     // Initialize actuators
     pinMode(LED_GREEN, OUTPUT);
@@ -55,6 +55,7 @@ IHM::IHM(): m_alarm_enabled(true), m_alarm_running(false)
 IHM::~IHM()
 {
     std::cout << "Shutting down alarms" << std::endl;
+    stop_alarm();
     digitalWrite(LED_GREEN, LOW);
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
@@ -70,7 +71,7 @@ void IHM::start_alarm(std::string error_msg)
 
     if (!m_alarm_running && m_alarm_enabled){
         m_alarm_running = true;
-        m_alarm_thread = std::make_unique<std::thread>(std::thread([this]() {
+        m_alarm_thread = std::make_unique<std::thread>(std::thread([this]{
             make_noise();
         }));
     }
@@ -106,18 +107,25 @@ void IHM::no_temp()
 
 void IHM::set_alarm_enabled(bool enable)
 {
+    std::cout << "Alarm set to " << enable << std::endl;
     m_alarm_enabled = enable;
+
+    if (m_alarm_running && !m_alarm_enabled){
+        m_alarm_thread->join();
+    }
 }
 
 void IHM::make_noise()
 {
-    while(m_alarm_running)
+    while(m_alarm_running && m_alarm_enabled)
     {
         digitalWrite(ALARM, HIGH);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         digitalWrite(ALARM, LOW);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
+
+    m_alarm_running = false;
 }
 
 //// LoRa Receiver ////
@@ -174,8 +182,8 @@ LoraReceiver::~LoraReceiver(){
 
 int LoraReceiver::recv(float* temp)
 {
-    // We allow one message every minute as timeout
-    for(int i=0; i < 60; i++)
+    // We allow a timeout
+    for(int i=0; i < 30; i++)
     {
         if (m_rf95.available())
         {
@@ -185,9 +193,15 @@ int LoraReceiver::recv(float* temp)
 
             if (m_rf95.recv(buf, &len))
             {
-                std::cout << "Data: " << (char *)buf << std::endl;
-                *temp = std::stof((char *)buf);
-                return 1;
+                try {
+                    std::cout << "Data: " << (char *)buf << std::endl;
+                    *temp = std::stof((char *)buf);
+                    return 1;
+                }
+                catch (...) {
+                    std::cout << "No temperature received from sensor" << std::endl;
+                    return -1;
+                }
             }
         }
 
@@ -217,17 +231,30 @@ void ZmqSender::initialize_socket()
     m_socket->setsockopt(ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
 }
 
-int ZmqSender::send(float temp, int alarm)
+int ZmqSender::send(float temp, std::string status)
 {
     // check datetime
     time_t now = time(0);
     struct tm * timeinfo = localtime(&now);
-    char buffer[30];
-    strftime(buffer,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
+    char datetime_str[30];
+    strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
 
     // create message
-    zmq::message_t request(40);
-    snprintf((char *) request.data(), 40, "%s %2.2f %d", buffer, temp, alarm);
+    std::ostringstream json_stream;
+
+    json_stream << std::setprecision(2) << std::fixed
+                << "{"
+                << "\"datetime\":\"" << datetime_str << "\","
+                << "\"temperature\":" << temp << ","
+                << "\"alarm_current\":\"" << status << "\""
+                << "}";
+
+    std::string json_msg = json_stream.str();
+
+    zmq::message_t request(json_msg.length()+1);
+    snprintf((char *) request.data(), 
+              json_msg.length()+1, 
+              json_msg.c_str());
 
     // send it
     int result = m_socket->send(request);
@@ -235,7 +262,7 @@ int ZmqSender::send(float temp, int alarm)
     return result;
 }
 
-int ZmqSender::receive(std::string response)
+int ZmqSender::receive(bool* alarm_enabled)
 {
     zmq::message_t reply;
     int result = m_socket->recv(&reply);
@@ -248,7 +275,8 @@ int ZmqSender::receive(std::string response)
 
     if (result > 0)
     {
-        std::cout << "Received " << reply.data() << std::endl;
+        std::istringstream iss(static_cast<char*>(reply.data()));
+        iss >> *alarm_enabled;
     }
     
     return result;
@@ -301,36 +329,43 @@ int main(int argc, const char *argv[])
     ZmqSender zmq_sender(url);
     IHM ihm;
 
+    std::map<std::string, std::string> errors = {
+        {"tempLow",         "Temp too low"},
+        {"errArduino",      "No temp received" },
+        {"errWebserver",    "No webserver" }
+    };
+
     while (!force_exit)
     {
-        float temp;
+        float temp = 99;
+        bool alarm_enabled = ihm.get_alarm_enabled();
+        std::string status = "ok";
+        std::string print_status = "";
 
         if (lora_receiver.recv(&temp) > 0)
         {
             ihm.print_temp(temp);
-
-            zmq_sender.send(temp, 1);
-            std::string message;
-
-            if (zmq_sender.receive(message) <= 0)
-            {
-                ihm.start_alarm("No webserver");
-            }
-            else
-            {
-                ihm.stop_alarm();
-            }
-
-            if(temp < TRIGGER_TEMP)
-            {
-                ihm.start_alarm("Temp too low");
-            }
+            if(temp < TRIGGER_TEMP) { status = "tempLow"; }
         }
         else
         {
             ihm.no_temp();
-            ihm.start_alarm("No temp received");
+            status = "errArduino";
         }
+
+        zmq_sender.send(temp, status);
+
+        if (zmq_sender.receive(&alarm_enabled) <= 0) { 
+            if (status != "templow") { status = "errWebserver"; }
+        }
+
+        if (ihm.get_alarm_enabled() != alarm_enabled)
+        {
+            ihm.set_alarm_enabled(alarm_enabled);
+        }
+
+        if (status == "ok") { ihm.stop_alarm(); }
+        else { ihm.start_alarm(errors[status]); }        
     }
 
     return 0;

@@ -6,6 +6,7 @@
 #include <csignal>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 #include <bcm2835.h> // Includes for PINs
 #include <RasPi.h> // Includes for PINs
@@ -57,6 +58,7 @@ class IHM
     void stop_alarm();
     int print_temp(float temp);
     void no_temp();
+    bool get_alarm_enabled(){return m_alarm_enabled;}
     void set_alarm_enabled(bool enable);
     void make_noise();
 
@@ -64,7 +66,7 @@ class IHM
     InfoScreen m_info_screen;
     std::unique_ptr<std::thread> m_alarm_thread;
     bool m_alarm_enabled;
-    bool m_alarm_running;
+    std::atomic<bool> m_alarm_running;
 };
 
 class LoraReceiver
@@ -85,8 +87,8 @@ class ZmqSender
     ZmqSender(std::string url);
 
     void initialize_socket();
-    int send(float temp, int alarm);
-    int receive(std::string response);
+    int send(float temp, std::string status);
+    int receive(bool* alarm_enabled);
 
   private:
     zmq::context_t m_context;
