@@ -69,7 +69,7 @@ void IHM::start_alarm(std::string error_msg)
     digitalWrite(LED_GREEN, LOW);
     digitalWrite(LED_RED, HIGH);
 
-    if (!m_alarm_running && m_alarm_enabled){
+    if (!m_alarm_running && m_alarm_enabled && error_msg != "No webserver"){
         m_alarm_running = true;
         m_alarm_thread = std::make_unique<std::thread>(std::thread([this]{
             make_noise();
@@ -200,7 +200,6 @@ int LoraReceiver::recv(float* temp)
                 }
                 catch (...) {
                     std::cout << "No temperature received from sensor" << std::endl;
-                    return -1;
                 }
             }
         }
@@ -215,7 +214,8 @@ int LoraReceiver::recv(float* temp)
 }
 
 //// ZMQ Sender ////
-ZmqSender::ZmqSender(std::string url): m_context(1), m_url(url)
+ZmqSender::ZmqSender(std::string url)
+: m_context(1), m_url(url), m_last_time(0),m_last_temp(-99)
 {
     std::cout << "Connecting to server at address " << url << std::endl;
     initialize_socket();
@@ -224,62 +224,89 @@ ZmqSender::ZmqSender(std::string url): m_context(1), m_url(url)
 void ZmqSender::initialize_socket()
 {
     m_socket = std::make_unique<zmq::socket_t>(m_context, ZMQ_REQ);
-    m_socket->connect(m_url);
-
     int timeout = 10000;
+    
     m_socket->setsockopt(ZMQ_SNDTIMEO, &timeout, sizeof(timeout));
     m_socket->setsockopt(ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
+    m_socket->connect(m_url);
 }
 
 int ZmqSender::send(float temp, std::string status)
 {
-    // check datetime
-    time_t now = time(0);
-    struct tm * timeinfo = localtime(&now);
-    char datetime_str[30];
-    strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
+    try
+    {
+         // check datetime
+        time_t now = time(0);
+        struct tm * timeinfo = localtime(&now);
+        char datetime_str[30];
+        strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
 
-    // create message
-    std::ostringstream json_stream;
+        if (difftime(now, m_last_time) < 60 && abs(temp - m_last_temp) > 1)
+        {
+            std::cout << "Ignoring value " << temp << std::endl;
+            return 1;
+        }
 
-    json_stream << std::setprecision(2) << std::fixed
-                << "{"
-                << "\"datetime\":\"" << datetime_str << "\","
-                << "\"temperature\":" << temp << ","
-                << "\"alarm_current\":\"" << status << "\""
-                << "}";
+        m_last_temp = temp;
+        m_last_time = now;
 
-    std::string json_msg = json_stream.str();
+        // create message
+        std::ostringstream json_stream;
 
-    zmq::message_t request(json_msg.length()+1);
-    snprintf((char *) request.data(), 
-              json_msg.length()+1, 
-              json_msg.c_str());
+        json_stream << std::setprecision(2) << std::fixed
+                    << "{"
+                    << "\"datetime\":\"" << datetime_str << "\","
+                    << "\"temperature\":" << temp << ","
+                    << "\"alarm_current\":\"" << status << "\""
+                    << "}";
 
-    // send it
-    int result = m_socket->send(request);
+        std::string json_msg = json_stream.str();
 
-    return result;
+        zmq::message_t request(json_msg.length()+1);
+        snprintf((char *) request.data(), 
+                json_msg.length()+1, 
+                json_msg.c_str());
+
+        // send it
+        int result = m_socket->send(request);
+
+        return result;
+    }
+    catch (...)
+    {
+        std::cout << "ZMQ crashed" << std::endl;
+        return 1;
+    }
+   
 }
 
 int ZmqSender::receive(bool* alarm_enabled)
 {
-    zmq::message_t reply;
-    int result = m_socket->recv(&reply);
-
-    if (result <= 0)
+    try
     {
-        // delete client if answer not received
-        initialize_socket();
-    }
+        zmq::message_t reply;
+        int result = m_socket->recv(&reply);
 
-    if (result > 0)
-    {
-        std::istringstream iss(static_cast<char*>(reply.data()));
-        iss >> *alarm_enabled;
+        if (result <= 0)
+        {
+            // delete client if answer not received
+            std::cout << "Webserver is down" << std::endl;
+            initialize_socket();
+        }
+
+        if (result > 0)
+        {
+            std::istringstream iss(static_cast<char*>(reply.data()));
+            iss >> *alarm_enabled;
+        }
+        
+        return result;
     }
-    
-    return result;
+    catch (...)
+    {
+        std::cout << "ZMQ crashed" << std::endl;
+        return 1;
+    }
 }
 
 //Flag for Ctrl-C
@@ -356,7 +383,7 @@ int main(int argc, const char *argv[])
         zmq_sender.send(temp, status);
 
         if (zmq_sender.receive(&alarm_enabled) <= 0) { 
-            if (status != "templow") { status = "errWebserver"; }
+            if (status == "ok") { status = "errWebserver"; }
         }
 
         if (ihm.get_alarm_enabled() != alarm_enabled)
