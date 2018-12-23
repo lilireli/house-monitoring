@@ -383,7 +383,7 @@ int main(int argc, const char *argv[])
         zmq_sender.send(temp, status);
 
         if (zmq_sender.receive(&alarm_enabled) <= 0) { 
-            if (status != "templow") { status = "errWebserver"; }
+            if (status == "ok") { status = "errWebserver"; }
         }
 
         if (ihm.get_alarm_enabled() != alarm_enabled)
