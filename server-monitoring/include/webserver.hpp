@@ -22,6 +22,8 @@
 #include "client_http.hpp"
 #include "server_http.hpp"
 
+#define DB_INSERT_INTERVAL 600
+
 using HttpServer = SimpleWeb::Server<SimpleWeb::HTTP>;
 using HttpClient = SimpleWeb::Client<SimpleWeb::HTTP>;
 
@@ -119,6 +121,18 @@ class Database
 
   private:
     static std::string m_db_path;
+};
+
+// Aggregator functions
+class Aggregator
+{
+  public:
+    Aggregator(): m_last_time(0) {}
+    void add_new_value(float temperature, std::string timestamp);
+
+  private:
+    std::vector<float> m_temps;
+    time_t m_last_time;
 };
 
 // Server functions

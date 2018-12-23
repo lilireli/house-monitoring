@@ -145,6 +145,38 @@ void Database::empty_table()
     }
 }
 
+//// Aggregator ////
+void Aggregator::add_new_value(float temperature, std::string timestamp)
+{
+    struct tm current_tm;
+
+    memset(&current_tm, 0, sizeof(struct tm));
+    strptime(timestamp.c_str(), "%Y-%m-%dT%H:%M:%S", &current_tm);
+
+    if (m_last_time == 0)
+    {
+        m_last_time = mktime(&current_tm);
+    }
+
+    if (difftime(mktime(&current_tm), m_last_time) > DB_INSERT_INTERVAL)
+    {
+        struct tm * timeinfo = localtime(&m_last_time);
+        char datetime_str[30];
+        strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
+
+        float average = std::accumulate(m_temps.begin(), m_temps.end(), 0.0)
+                        /m_temps.size(); 
+
+        Database().insert_db(datetime_str, average);
+        Logger() << "Insert";
+
+        m_last_time = mktime(&current_tm);
+        m_temps.clear();
+    }
+
+    m_temps.push_back(temperature);
+}
+
 //// Server ////
 Server::Server(int port)
 {
@@ -273,7 +305,7 @@ std::stringstream Server::get_kpi_temp()
     std::string query = 
         "select min(temperature_celsius), max(temperature_celsius) "
         "from temperature_serre "
-        "where received_time > date('now','-1 day');";
+        "where date(received_time) > date('now','-1 day');";
 
     float minTemp = -99;
     float maxTemp = -99;
@@ -322,7 +354,7 @@ std::stringstream Server::get_graph_temp()
         "   datetime(strftime('%s', received_time) / 3600 * 3600, 'unixepoch', 'localtime'), "
         "   avg(temperature_celsius) "
         "from temperature_serre "
-        "where received_time > date('now', '-7 day') "
+        "where date(received_time) > date('now', '-7 day') "
         "group by 1 "
         "order by received_time asc;";
 
@@ -413,6 +445,8 @@ void ZmqReceiver::initialize_socket()
 
 void ZmqReceiver::communicate()
 {
+    Aggregator aggregator;
+
     while (true) {
         //  Wait for next request from client
         zmq::message_t request;
@@ -441,7 +475,7 @@ void ZmqReceiver::communicate()
         std::string alarm_current = root.get<std::string>("alarm_current");
 
         if (alarm_current != "errArduino"){
-            Database().insert_db(timestamp, temperature);
+            aggregator.add_new_value(temperature, timestamp);
         }
 
         if (alarm_current == "tempLow")
