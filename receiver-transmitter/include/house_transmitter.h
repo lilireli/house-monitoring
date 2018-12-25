@@ -35,7 +35,7 @@
 #define RF_FREQUENCY  868.00
 #define RF_NODE_ID    1
 
-#define TRIGGER_TEMP    5 // in degrees
+#define TRIGGER_TEMP    3 // in degrees
 
 class InfoScreen
 {

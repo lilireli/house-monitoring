@@ -30,7 +30,8 @@ std::vector<std::vector<std::string>> Database::query_db(std::string query, uint
     if (sqlite3_open(m_db_path.c_str(), &db))
     {
         Logger() << "Can't open database: " << sqlite3_errmsg(db);
-        throw std::invalid_argument("cannot open database");;
+        sqlite3_close(db);
+        throw std::invalid_argument("cannot open database");
     }
 
     try
@@ -75,6 +76,7 @@ void Database::insert_db(std::string timestamp, float temperature)
     if (sqlite3_open(m_db_path.c_str(), &db))
     {
         Logger() << "Can't open database: " << sqlite3_errmsg(db);
+        sqlite3_close(db);
         throw std::invalid_argument("cannot open database");
     }
 
@@ -121,6 +123,7 @@ void Database::empty_table()
     if (sqlite3_open(m_db_path.c_str(), &db))
     {
         Logger() << "Can't open database: " << sqlite3_errmsg(db);
+        sqlite3_close(db);
         throw std::invalid_argument("cannot open database");
     }
 
