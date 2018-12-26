@@ -327,7 +327,7 @@ std::stringstream Server::get_kpi_temp()
     query = 
         "select temperature_celsius "
         "from temperature_serre "
-        "where datetime(received_time) > datetime('now', '-10 minute', 'localtime') "
+        "where datetime(received_time) > datetime('now', '-30 minute', 'localtime') "
         "order by received_time desc "
         "limit 1;";
 
