@@ -129,7 +129,7 @@ void IHM::make_noise()
 }
 
 //// LoRa Receiver ////
-LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN)
+LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN), m_last_time(0), m_last_temp(-99)
 {
     // Initialize Pins
     if (!bcm2835_init())
@@ -196,6 +196,18 @@ int LoraReceiver::recv(float* temp)
                 try {
                     std::cout << "Data: " << (char *)buf << std::endl;
                     *temp = std::stof((char *)buf);
+
+                    time_t now = time(0);
+
+                    if (difftime(now, m_last_time) < 60 && abs(*temp - m_last_temp) > 1)
+                    {
+                        std::cout << "Ignoring value " << *temp << std::endl;
+                        throw std::string("Ignoring value\n");;
+                    }
+
+                    m_last_temp = *temp;
+                    m_last_time = now;
+
                     return 1;
                 }
                 catch (...) {
@@ -214,8 +226,7 @@ int LoraReceiver::recv(float* temp)
 }
 
 //// ZMQ Sender ////
-ZmqSender::ZmqSender(std::string url)
-: m_context(1), m_url(url), m_last_time(0),m_last_temp(-99)
+ZmqSender::ZmqSender(std::string url): m_context(1), m_url(url)
 {
     std::cout << "Connecting to server at address " << url << std::endl;
     initialize_socket();
@@ -240,15 +251,6 @@ int ZmqSender::send(float temp, std::string status)
         struct tm * timeinfo = localtime(&now);
         char datetime_str[30];
         strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
-
-        if (difftime(now, m_last_time) < 60 && abs(temp - m_last_temp) > 1)
-        {
-            std::cout << "Ignoring value " << temp << std::endl;
-            return 1;
-        }
-
-        m_last_temp = temp;
-        m_last_time = now;
 
         // create message
         std::ostringstream json_stream;

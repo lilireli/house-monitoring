@@ -79,6 +79,8 @@ class LoraReceiver
 
   private:
     RH_RF95 m_rf95;
+    time_t m_last_time;
+    float m_last_temp;
 };
 
 class ZmqSender
@@ -94,8 +96,6 @@ class ZmqSender
     zmq::context_t m_context;
     std::unique_ptr<zmq::socket_t> m_socket;
     std::string m_url;
-    time_t m_last_time;
-    float m_last_temp;
 };
 
 // Handling Ctrl-C interrupt
