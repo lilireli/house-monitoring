@@ -199,7 +199,7 @@ int LoraReceiver::recv(float* temp)
 
                     time_t now = time(0);
 
-                    if (difftime(now, m_last_time) < 60 && abs(*temp - m_last_temp) > 1)
+                    if (difftime(now, m_last_time) < 30 && abs(*temp - m_last_temp) > 2)
                     {
                         std::cout << "Ignoring value " << *temp << std::endl;
                         throw std::string("Ignoring value\n");;
