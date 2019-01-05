@@ -183,7 +183,7 @@ LoraReceiver::~LoraReceiver(){
 int LoraReceiver::recv(float* temp)
 {
     // We allow a timeout
-    for(int i=0; i < 30; i++)
+    for(int i=0; i < 60; i++)
     {
         if (m_rf95.available())
         {
