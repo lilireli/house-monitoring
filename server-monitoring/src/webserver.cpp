@@ -478,62 +478,53 @@ void ZmqReceiver::communicate()
     Aggregator aggregator;
 
     while (true) {
-        std::chrono::seconds seconds(1);
-    std::this_thread::sleep_for(seconds);
+        //  Wait for next request from client
+        zmq::message_t request;
 
-    for (float i = 0; i < 10; i++)
-    {
-        std::cout << "insert data " << i << std::endl;
-        Database().insert_db("artsvz", i);
-    }
-
-        // //  Wait for next request from client
-        // zmq::message_t request;
-
-        // m_socket->recv(&request);
+        m_socket->recv(&request);
         
-        // // We need to remove unuseful characters at the end of the string
-        // std::string req_corrupt = std::string(static_cast<char*>(request.data()), request.size());
-        // std::size_t req_corrupt_end = req_corrupt.find("}");
+        // We need to remove unuseful characters at the end of the string
+        std::string req_corrupt = std::string(static_cast<char*>(request.data()), request.size());
+        std::size_t req_corrupt_end = req_corrupt.find("}");
         
-        // if (req_corrupt_end == std::string::npos)
-        // {
-        //     Logger() << "Received badly formatted message";
-        //     Logger().setState(Error::ERRRASPBERRY);
-        //     return;
-        // }
+        if (req_corrupt_end == std::string::npos)
+        {
+            Logger() << "Received badly formatted message";
+            Logger().setState(Error::ERRRASPBERRY);
+            return;
+        }
 
-        // std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
-        // pt::ptree root;
+        std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
+        pt::ptree root;
 
-        // Logger() << req.str();
+        Logger() << req.str();
     
-        // pt::read_json(req, root);
-        // std::string timestamp = root.get<std::string>("datetime");
-        // float temperature = root.get<float>("temperature");
-        // std::string alarm_current = root.get<std::string>("alarm_current");
+        pt::read_json(req, root);
+        std::string timestamp = root.get<std::string>("datetime");
+        float temperature = root.get<float>("temperature");
+        std::string alarm_current = root.get<std::string>("alarm_current");
 
-        // if (alarm_current != "errArduino"){
-        //     aggregator.add_new_value(temperature, timestamp);
-        // }
+        if (alarm_current != "errArduino"){
+            aggregator.add_new_value(temperature, timestamp);
+        }
 
-        // if (alarm_current == "tempLow")
-        // {
-        //     Logger().setState(Error::TEMPLOW);
-        // }
-        // else if (alarm_current == "errArduino")
-        // {
-        //     Logger().setState(Error::ERRARDUINO);
-        // }
-        // else
-        // {
-        //     Logger().setState(Error::OK);
-        // }
+        if (alarm_current == "tempLow")
+        {
+            Logger().setState(Error::TEMPLOW);
+        }
+        else if (alarm_current == "errArduino")
+        {
+            Logger().setState(Error::ERRARDUINO);
+        }
+        else
+        {
+            Logger().setState(Error::OK);
+        }
         
-        // //  Send reply back to client
-        // zmq::message_t reply (5);
-        // snprintf((char *)reply.data (), 5, "%d", Logger().getAlarmEnabled());
-        // m_socket->send (reply);
+        //  Send reply back to client
+        zmq::message_t reply (5);
+        snprintf((char *)reply.data (), 5, "%d", Logger().getAlarmEnabled());
+        m_socket->send (reply);
     }
 }
 
