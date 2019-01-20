@@ -59,24 +59,32 @@ std::vector<std::vector<std::string>> Database::query_db(std::string query, uint
         sqlite3_prepare( db, query.c_str(), -1, &stmt, NULL ); 
         sqlite3_step( stmt ); //executing the statement
 
-        for(uint i = 0; i < nb_cols; i++ )
-            result.push_back(std::vector< std::string >());
-
-        if (!sqlite3_column_text(stmt, 0))
+        try
         {
-            Logger() << "Query did not match any data";
-            throw std::invalid_argument("query did not match any data");
-        }
+            for(uint i = 0; i < nb_cols; i++ )
+                result.push_back(std::vector< std::string >());
 
-        while(sqlite3_column_text(stmt, 0))
+            if (!sqlite3_column_text(stmt, 0))
+            {
+                Logger() << "Query did not match any data";
+                throw std::invalid_argument("query did not match any data");
+            }
+
+            while(sqlite3_column_text(stmt, 0))
+            {
+                for(uint i = 0; i < nb_cols; i++)
+                    result[i].push_back(std::string((char *)sqlite3_column_text(stmt, i)));
+                sqlite3_step( stmt );
+            }
+
+            sqlite3_finalize(stmt);
+            sqlite3_close(db);
+        }
+        catch(...)
         {
-            for(uint i = 0; i < nb_cols; i++)
-                result[i].push_back(std::string((char *)sqlite3_column_text(stmt, i)));
-            sqlite3_step( stmt );
+            sqlite3_finalize(stmt);
+            throw;
         }
-
-        sqlite3_finalize(stmt);
-        sqlite3_close(db);
     }
     catch(...)
     {
@@ -470,53 +478,62 @@ void ZmqReceiver::communicate()
     Aggregator aggregator;
 
     while (true) {
-        //  Wait for next request from client
-        zmq::message_t request;
+        std::chrono::seconds seconds(1);
+    std::this_thread::sleep_for(seconds);
 
-        m_socket->recv(&request);
+    for (float i = 0; i < 10; i++)
+    {
+        std::cout << "insert data " << i << std::endl;
+        Database().insert_db("artsvz", i);
+    }
+
+        // //  Wait for next request from client
+        // zmq::message_t request;
+
+        // m_socket->recv(&request);
         
-        // We need to remove unuseful characters at the end of the string
-        std::string req_corrupt = std::string(static_cast<char*>(request.data()), request.size());
-        std::size_t req_corrupt_end = req_corrupt.find("}");
+        // // We need to remove unuseful characters at the end of the string
+        // std::string req_corrupt = std::string(static_cast<char*>(request.data()), request.size());
+        // std::size_t req_corrupt_end = req_corrupt.find("}");
         
-        if (req_corrupt_end == std::string::npos)
-        {
-            Logger() << "Received badly formatted message";
-            Logger().setState(Error::ERRRASPBERRY);
-            return;
-        }
+        // if (req_corrupt_end == std::string::npos)
+        // {
+        //     Logger() << "Received badly formatted message";
+        //     Logger().setState(Error::ERRRASPBERRY);
+        //     return;
+        // }
 
-        std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
-        pt::ptree root;
+        // std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
+        // pt::ptree root;
 
-        Logger() << req.str();
+        // Logger() << req.str();
     
-        pt::read_json(req, root);
-        std::string timestamp = root.get<std::string>("datetime");
-        float temperature = root.get<float>("temperature");
-        std::string alarm_current = root.get<std::string>("alarm_current");
+        // pt::read_json(req, root);
+        // std::string timestamp = root.get<std::string>("datetime");
+        // float temperature = root.get<float>("temperature");
+        // std::string alarm_current = root.get<std::string>("alarm_current");
 
-        if (alarm_current != "errArduino"){
-            aggregator.add_new_value(temperature, timestamp);
-        }
+        // if (alarm_current != "errArduino"){
+        //     aggregator.add_new_value(temperature, timestamp);
+        // }
 
-        if (alarm_current == "tempLow")
-        {
-            Logger().setState(Error::TEMPLOW);
-        }
-        else if (alarm_current == "errArduino")
-        {
-            Logger().setState(Error::ERRARDUINO);
-        }
-        else
-        {
-            Logger().setState(Error::OK);
-        }
+        // if (alarm_current == "tempLow")
+        // {
+        //     Logger().setState(Error::TEMPLOW);
+        // }
+        // else if (alarm_current == "errArduino")
+        // {
+        //     Logger().setState(Error::ERRARDUINO);
+        // }
+        // else
+        // {
+        //     Logger().setState(Error::OK);
+        // }
         
-        //  Send reply back to client
-        zmq::message_t reply (5);
-        snprintf((char *)reply.data (), 5, "%d", Logger().getAlarmEnabled());
-        m_socket->send (reply);
+        // //  Send reply back to client
+        // zmq::message_t reply (5);
+        // snprintf((char *)reply.data (), 5, "%d", Logger().getAlarmEnabled());
+        // m_socket->send (reply);
     }
 }
 
