@@ -10,9 +10,9 @@ var kpiTemp = new Vue({
             axios
                 .get('/kpi-temp')
                 .then(response => (
-                    this.currentTemp = response.data.currentTemp,
-                    this.minTemp = response.data.minTemp,
-                    this.maxTemp = response.data.maxTemp
+                    this.currentTemp = parseInt(response.data.currentTemp) != -99 ? response.data.currentTemp : 'NA',
+                    this.minTemp = parseInt(response.data.minTemp) != -99 ? response.data.minTemp : 'NA',
+                    this.maxTemp = parseInt(response.data.maxTemp) != -99 ? response.data.maxTemp : 'NA'
                 ))
         }
     },
@@ -107,6 +107,7 @@ var alert = new Vue({
                     case "errArduino": alert = "Le capteur dans la serre ne fonctionne plus"; break;
                     case "errRaspberry": alert = "Le transmetteur de température ne fonctionne pas"; break;
                     case "errWebserver": alert = "Une erreur interne est survenue sur le serveur web"; break;
+                    case "errNoData": alert = "Aucune donnée n'a été reçue depuis longtemps"; break;
 
                 }
 

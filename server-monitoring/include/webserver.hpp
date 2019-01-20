@@ -32,7 +32,8 @@ enum class Error {
     TEMPLOW,
     ERRARDUINO,
     ERRRASPBERRY,
-    ERRWEBSERVER
+    ERRWEBSERVER,
+    ERRNODATA
 };
 
 // Config
@@ -113,14 +114,19 @@ class Database
         m_db_path = db_path;
     }
 
+    sqlite3* open_db();
+
     std::vector<std::vector<std::string>> query_db(std::string query, uint nb_cols);
 
     void insert_db(std::string timestamp, float temperature);
 
     void empty_table();
 
+    void empty_table_cron();
+
   private:
     static std::string m_db_path;
+    std::unique_ptr<std::thread> m_db_thread;
 };
 
 // Aggregator functions

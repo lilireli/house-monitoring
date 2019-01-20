@@ -22,17 +22,35 @@ Config::Config(std::string config_file)
 }
 
 //// Database ////
-std::vector<std::vector<std::string>> Database::query_db(std::string query, uint nb_cols)
+sqlite3* Database::open_db()
 {
     sqlite3 *db;
-    std::vector<std::vector<std::string>> result;
+    int trials = 4;
 
-    if (sqlite3_open(m_db_path.c_str(), &db))
+    std::chrono::seconds interval(1);
+
+    // Try to open database and retry if locked
+    for (int i = 1; i < trials; i++)
     {
-        Logger() << "Can't open database: " << sqlite3_errmsg(db);
-        sqlite3_close(db);
-        throw std::invalid_argument("cannot open database");
+        if (sqlite3_open(m_db_path.c_str(), &db) == 0) {
+            break;
+        }
+        
+        if (i == trials) {
+            Logger() << "Can't open database: " << sqlite3_errmsg(db);
+            throw std::invalid_argument("cannot open database");
+        }
+        
+        std::this_thread::sleep_for(interval);
     }
+
+    return db;
+}
+
+std::vector<std::vector<std::string>> Database::query_db(std::string query, uint nb_cols)
+{
+    std::vector<std::vector<std::string>> result;
+    sqlite3 *db = open_db();
 
     try
     {
@@ -73,12 +91,9 @@ void Database::insert_db(std::string timestamp, float temperature)
 {
     sqlite3 *db;
     
-    if (sqlite3_open(m_db_path.c_str(), &db))
-    {
-        Logger() << "Can't open database: " << sqlite3_errmsg(db);
-        sqlite3_close(db);
-        throw std::invalid_argument("cannot open database");
-    }
+    // This function should not throw
+    try { db = open_db(); }
+    catch (...) { return; }
 
     try
     {
@@ -102,50 +117,53 @@ void Database::insert_db(std::string timestamp, float temperature)
     catch (...)
     {
         sqlite3_close(db);
-        throw;
-    }
-
-    // check time and empty table if it's midnight
-    time_t now = time(0);
-    struct tm * timeinfo = localtime(&now);
-
-    if (timeinfo->tm_hour == 0 && timeinfo->tm_min == 0 && timeinfo->tm_sec < 10)
-    {
-        Logger() << "Emptying table";
-        empty_table();
     }
 }
 
 void Database::empty_table()
 {
-    sqlite3 *db;
+    std::chrono::hours duration(24);
 
-    if (sqlite3_open(m_db_path.c_str(), &db))
+    while(true)
     {
-        Logger() << "Can't open database: " << sqlite3_errmsg(db);
-        sqlite3_close(db);
-        throw std::invalid_argument("cannot open database");
-    }
+        sqlite3 *db;
 
-    try
-    {
-        std::string query =
-            "DELETE FROM temperature_serre "
-            "WHERE date(received_time) < date('now', '-1 month');";
+        // This function should not throw
+        try { db = open_db(); }
+        catch (...) { return; }
 
-        char* msgErr;
-    
-        if (sqlite3_exec(db, query.c_str(), NULL, 0, &msgErr) != SQLITE_OK) { 
-            Logger() << "Error delete from table:" <<  msgErr;
-            sqlite3_free(msgErr);
-        }
+        try
+        {   
+            Logger() << "Deleting old data";
+
+            std::string query =
+                "DELETE FROM temperature_serre "
+                "WHERE date(received_time) < date('now', '-1 month');";
+
+            char* msgErr;
         
-        sqlite3_close(db);
+            if (sqlite3_exec(db, query.c_str(), NULL, 0, &msgErr) != SQLITE_OK) { 
+                Logger() << "Error delete from table:" <<  msgErr;
+                sqlite3_free(msgErr);
+            }
+            
+            sqlite3_close(db);
+        }
+        catch (...)
+        {
+            sqlite3_close(db);
+        }
+
+        std::this_thread::sleep_for(duration);
     }
-    catch (...)
-    {
-        sqlite3_close(db);
-    }
+}
+
+void Database::empty_table_cron()
+{
+    m_db_thread = std::make_unique<std::thread>(std::thread([this]() {
+        empty_table();
+    }));
+    m_db_thread->join();
 }
 
 //// Aggregator ////
@@ -308,7 +326,7 @@ std::stringstream Server::get_kpi_temp()
     std::string query = 
         "select min(temperature_celsius), max(temperature_celsius) "
         "from temperature_serre "
-        "where date(received_time) > date('now','-1 day');";
+        "where datetime(received_time) > datetime('now','-1 day');";
 
     float minTemp = -99;
     float maxTemp = -99;
@@ -321,7 +339,7 @@ std::stringstream Server::get_kpi_temp()
     }
     catch(...) {
         Logger() << "Error while retrieving temperatures min max";
-        Logger().setState(Error::ERRWEBSERVER);
+        Logger().setState(Error::ERRNODATA);
     }
 
     query = 
@@ -337,7 +355,7 @@ std::stringstream Server::get_kpi_temp()
     }
     catch(...) {
         Logger() << "Error while retrieving current temperature";
-        Logger().setState(Error::ERRWEBSERVER);
+        Logger().setState(Error::ERRNODATA);
     }
 
     stream << std::fixed << std::setw(2) << std::setprecision(2)
@@ -396,6 +414,7 @@ std::stringstream Server::get_alarm_status()
         case Error::ERRARDUINO: state = "errArduino"; break;
         case Error::ERRRASPBERRY: state = "errRaspberry"; break;
         case Error::ERRWEBSERVER: state = "errWebserver"; break;
+        case Error::ERRNODATA: state = "errNoData"; break;
     }
 
     stream << "{\"status\":\"" << state << "\"}";
@@ -549,6 +568,8 @@ int main(int argc, char *argv[])
 
     Logger() << "Starting sensor listener at port " << conf.getZmqPort();
     zmq_receiver.start();
+
+    Database().empty_table_cron();
 
     zmq_receiver.stop();
     server.stop();
