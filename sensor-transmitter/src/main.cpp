@@ -62,16 +62,18 @@ void loop()
         return;
     }
 
-    /* Print temperature */
-    Serial.print("Temperature : ");
-    Serial.print(temperature, 2);
-    Serial.print("C");
-    Serial.println();
-
-    Serial.println("Sending to rf95_server");
+    /* Print temperature (for debug purpose) */
+    // Serial.print("Temperature : ");
+    // Serial.print(temperature, 2);
+    // Serial.print("C");
+    // Serial.println();
+    //
+    // Serial.println("Sending to rf95_server");
 
     digitalWrite(led_pin, HIGH);
+    datastring += "{\"id\": \"serre001\", \"temp\": ";
     datastring += dtostrf(temperature, 4, 2, databuf);
+    datastring += "}";
     strcpy((char *)dataoutgoing,databuf);
 
     rf95.send(dataoutgoing, sizeof(dataoutgoing));

@@ -15,6 +15,8 @@
 #include "LiquidCrystal.h" // LCD screen
 #include <zmq.hpp>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 // Those numbers are the one of the pins of Raspberry (without any conversion)
 #define RF_CS_PIN  RPI_V2_GPIO_P1_26 // Slave Select on GPIO25 so P1 connector pin #22
@@ -35,7 +37,8 @@
 #define RF_FREQUENCY  868.00
 #define RF_NODE_ID    1
 
-#define TRIGGER_TEMP    3 // in degrees
+#define TRIGGER_TEMP        3     // in degrees
+#define WAITING_TIME_ALARM  3600  // in seconds
 
 class InfoScreen
 {
@@ -61,12 +64,17 @@ class IHM
     bool get_alarm_enabled(){return m_alarm_enabled;}
     void set_alarm_enabled(bool enable);
     void make_noise();
+    void blink_led();
 
   private:
     InfoScreen m_info_screen;
     std::unique_ptr<std::thread> m_alarm_thread;
+    std::unique_ptr<std::thread> m_led_thread;
     bool m_alarm_enabled;
+    std::atomic<bool> m_running;
     std::atomic<bool> m_alarm_running;
+    std::atomic<bool> m_noise_running;
+    time_t m_last_received;
 };
 
 class LoraReceiver
@@ -79,8 +87,6 @@ class LoraReceiver
 
   private:
     RH_RF95 m_rf95;
-    time_t m_last_time;
-    float m_last_temp;
 };
 
 class ZmqSender

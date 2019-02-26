@@ -12,6 +12,7 @@
 
 #include <house_transmitter.h>
 
+namespace pt = boost::property_tree;
 namespace po = boost::program_options;
 
 //// Info Screen ////
@@ -37,7 +38,7 @@ void InfoScreen::print_line_two(std::string text)
 }
 
 //// IHM ////
-IHM::IHM(): m_alarm_enabled(false), m_alarm_running(false)
+IHM::IHM(): m_alarm_enabled(false), m_alarm_running(false), m_running(true), m_last_received(time(0))
 {
     // Initialize actuators
     pinMode(LED_GREEN, OUTPUT);
@@ -50,12 +51,18 @@ IHM::IHM(): m_alarm_enabled(false), m_alarm_running(false)
 
     m_info_screen.print_line_one("Hello");
     m_info_screen.print_line_two("");
+
+    m_led_thread = std::make_unique<std::thread>(std::thread([this]{
+        blink_led();
+    }));
 }
 
 IHM::~IHM()
 {
     std::cout << "Shutting down alarms" << std::endl;
     stop_alarm();
+    m_running = false;
+    m_led_thread->join();
     digitalWrite(LED_GREEN, LOW);
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
@@ -66,11 +73,11 @@ IHM::~IHM()
 
 void IHM::start_alarm(std::string error_msg)
 {
-    digitalWrite(LED_GREEN, LOW);
-    digitalWrite(LED_RED, HIGH);
+    m_alarm_running = true;
 
-    if (!m_alarm_running && m_alarm_enabled && error_msg != "No webserver"){
-        m_alarm_running = true;
+    if (!m_noise_running && m_alarm_enabled 
+                         && error_msg != "No webserver" 
+                         && difftime(time(0), m_last_received) > WAITING_TIME_ALARM){
         m_alarm_thread = std::make_unique<std::thread>(std::thread([this]{
             make_noise();
         }));
@@ -81,14 +88,12 @@ void IHM::start_alarm(std::string error_msg)
 
 void IHM::stop_alarm()
 {
-    digitalWrite(LED_GREEN, HIGH);
-    digitalWrite(LED_RED, LOW);
-
-    if (m_alarm_running){
-        m_alarm_running = false;
+    m_alarm_running = false;
+    m_last_received = time(0);
+ 
+    if (m_noise_running){
         m_alarm_thread->join();
     }
-    digitalWrite(ALARM, LOW);
 
     m_info_screen.print_line_one("Hello");
 }
@@ -110,13 +115,15 @@ void IHM::set_alarm_enabled(bool enable)
     std::cout << "Alarm set to " << enable << std::endl;
     m_alarm_enabled = enable;
 
-    if (m_alarm_running && !m_alarm_enabled){
+    if (m_noise_running && !m_alarm_enabled){
         m_alarm_thread->join();
     }
 }
 
 void IHM::make_noise()
 {
+    m_noise_running = true;
+
     while(m_alarm_running && m_alarm_enabled)
     {
         digitalWrite(ALARM, HIGH);
@@ -125,11 +132,27 @@ void IHM::make_noise()
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
-    m_alarm_running = false;
+    m_noise_running = false;
+}
+
+void IHM::blink_led()
+{
+    int current_led = LED_RED;
+
+    while(m_running)
+    {
+        if (m_alarm_running) { current_led = LED_RED; }
+        else { current_led = LED_GREEN; }
+
+        digitalWrite(current_led, HIGH);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        digitalWrite(current_led, LOW);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
 }
 
 //// LoRa Receiver ////
-LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN), m_last_time(0), m_last_temp(-99)
+LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN)
 {
     // Initialize Pins
     if (!bcm2835_init())
@@ -182,7 +205,7 @@ LoraReceiver::~LoraReceiver(){
 
 int LoraReceiver::recv(float* temp)
 {
-    // We allow a timeout
+    // We allow a timeout before sending error
     for(int i=0; i < 60; i++)
     {
         if (m_rf95.available())
@@ -195,20 +218,23 @@ int LoraReceiver::recv(float* temp)
             {
                 try {
                     std::cout << "Data: " << (char *)buf << std::endl;
-                    *temp = std::stof((char *)buf);
 
-                    time_t now = time(0);
-
-                    // TODO: 60 sec is not enough as waiting time
-                    // TODO: message should have more structure to check if it really came from Arduino
-                    if (difftime(now, m_last_time) < 60 && abs(*temp - m_last_temp) > 2)
+                    // We need to remove unuseful characters at the end of the string
+                    std::string req_corrupt = std::string((char*)buf);
+                    std::size_t req_corrupt_end = req_corrupt.find("}");
+                    
+                    if (req_corrupt_end == std::string::npos)
                     {
-                        std::cout << "Ignoring value " << *temp << std::endl;
-                        throw std::string("Ignoring value\n");;
+                        std::cout << "Received badly formatted message";
+                        throw std::string("Badly formatted\n");
                     }
 
-                    m_last_temp = *temp;
-                    m_last_time = now;
+                    std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
+                    pt::ptree root;
+                
+                    pt::read_json(req, root);
+                    // Not used yet -> std::string device = root.get<std::string>("id");
+                    *temp = root.get<float>("temp");
 
                     return 1;
                 }
@@ -268,8 +294,8 @@ int ZmqSender::send(float temp, std::string status)
 
         zmq::message_t request(json_msg.length()+1);
         snprintf((char *) request.data(), 
-                json_msg.length()+1, 
-                json_msg.c_str());
+                 json_msg.length()+1, 
+                 json_msg.c_str());
 
         // send it
         int result = m_socket->send(request);
