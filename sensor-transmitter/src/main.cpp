@@ -27,7 +27,7 @@ int led_pin = 5;
 float temperature;
 String datastring="";
 char databuf[10];
-uint8_t dataoutgoing[10];
+uint8_t dataoutgoing[40];
 
 /* Return codes for the function getTemperature() */
 enum DS18B20_RCODES {
@@ -71,10 +71,11 @@ void loop()
     // Serial.println("Sending to rf95_server");
 
     digitalWrite(led_pin, HIGH);
+    datastring = "";
     datastring += "{\"id\": \"serre001\", \"temp\": ";
     datastring += dtostrf(temperature, 4, 2, databuf);
     datastring += "}";
-    strcpy((char *)dataoutgoing,databuf);
+    strcpy((char *)dataoutgoing,datastring.c_str());
 
     rf95.send(dataoutgoing, sizeof(dataoutgoing));
     rf95.waitPacketSent();

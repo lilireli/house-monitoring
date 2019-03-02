@@ -38,7 +38,11 @@ void InfoScreen::print_line_two(std::string text)
 }
 
 //// IHM ////
-IHM::IHM(): m_alarm_enabled(false), m_alarm_running(false), m_running(true), m_last_received(time(0))
+IHM::IHM(): m_alarm_enabled(false)
+          , m_running(true)
+          , m_alarm_running(false)
+          , m_noise_running(false)
+          , m_last_received(time(0))
 {
     // Initialize actuators
     pinMode(LED_GREEN, OUTPUT);
@@ -422,7 +426,7 @@ int main(int argc, const char *argv[])
         }
 
         if (status == "ok") { ihm.stop_alarm(); }
-        else { ihm.start_alarm(errors[status]); }        
+        else { ihm.start_alarm(errors[status]); }  
     }
 
     return 0;
