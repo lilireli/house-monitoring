@@ -7,6 +7,8 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <vector>
+#include <algorithm>
 
 #include <bcm2835.h> // Includes for PINs
 #include <RasPi.h> // Includes for PINs
@@ -39,6 +41,7 @@
 
 #define TRIGGER_TEMP        3     // in degrees
 #define WAITING_TIME_ALARM  3600  // in seconds
+#define SIZE_TEMP_KEEPER    24*15 // Keep per 15 minutes 24h of data
 
 class InfoScreen
 {
@@ -58,7 +61,7 @@ class IHM
     ~IHM();
 
     void start_alarm(std::string error_msg);
-    void stop_alarm();
+    void stop_alarm(float min_temp);
     int print_temp(float temp);
     void no_temp();
     bool get_alarm_enabled(){return m_alarm_enabled;}
@@ -102,6 +105,17 @@ class ZmqSender
     zmq::context_t m_context;
     std::unique_ptr<zmq::socket_t> m_socket;
     std::string m_url;
+};
+
+class TempKeeper
+{
+  public:
+    TempKeeper();
+    void add(float temp);
+    float min_24h();
+
+  private:
+    std::vector<float> m_temp_24h; // keeps last 24h min temp per 15 min
 };
 
 // Handling Ctrl-C interrupt

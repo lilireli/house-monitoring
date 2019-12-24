@@ -87,10 +87,10 @@ void IHM::start_alarm(std::string error_msg)
         }));
     }
 
-    m_info_screen.print_line_one(error_msg);
+    m_info_screen.print_line_two(error_msg);
 }
 
-void IHM::stop_alarm()
+void IHM::stop_alarm(float min_temp)
 {
     m_alarm_running = false;
     m_last_received = time(0);
@@ -99,19 +99,21 @@ void IHM::stop_alarm()
         m_alarm_thread->join();
     }
 
-    m_info_screen.print_line_one("Hello");
+    std::stringstream temp_stream;
+    temp_stream << std::fixed << std::setprecision(1) << min_temp;
+    m_info_screen.print_line_two("min 24h:  " + temp_stream.str() + " C");
 }
 
 int IHM::print_temp(float temp)
 {
     std::stringstream temp_stream;
-    temp_stream << std::fixed << std::setprecision(2) << temp;
-    m_info_screen.print_line_two("temp:    " + temp_stream.str() + " C");
+    temp_stream << std::fixed << std::setprecision(1) << temp;
+    m_info_screen.print_line_one("temp:     " + temp_stream.str() + " C");    
 }
 
 void IHM::no_temp()
 {
-    m_info_screen.print_line_two("");
+    m_info_screen.print_line_one("no temp");
 }
 
 void IHM::set_alarm_enabled(bool enable)
@@ -278,7 +280,7 @@ int ZmqSender::send(float temp, std::string status)
 {
     try
     {
-         // check datetime
+        // check datetime
         time_t now = time(0);
         struct tm * timeinfo = localtime(&now);
         char datetime_str[30];
@@ -343,6 +345,38 @@ int ZmqSender::receive(bool* alarm_enabled)
     }
 }
 
+TempKeeper::TempKeeper() 
+{
+    for (int i = 0; i < SIZE_TEMP_KEEPER; i++)
+    {
+        m_temp_24h.push_back(99);
+    }
+}
+
+void TempKeeper::add(float temp) 
+{
+    time_t now = time(0);
+    struct tm * timeinfo = localtime(&now);
+    int approx_curr_pos = 60 * timeinfo.tm_hour + timeinfo.tm_min;
+    int curr_pos = approx_curr_pos % SIZE_TEMP_KEEPER;
+
+    // Erase old values
+    int erase_pos = (curr_pos > 0) ? curr_pos - 1 : SIZE_TEMP_KEEPER - 1;
+    m_temp_24h[erase_pos] = 99;
+
+    // Compare new one with running 15 min
+    if (m_temp_24h[curr_pos] > temp)
+    {
+        m_temp_24h[curr_pos] = temp;
+    }
+}
+
+float TempKeeper::min_24h() 
+{
+    auto min = std::min_element(m_temp_24h.begin(), m_temp_24h.end());
+    return *min;
+}
+
 //Flag for Ctrl-C
 volatile sig_atomic_t force_exit = false;
 
@@ -389,6 +423,7 @@ int main(int argc, const char *argv[])
     LoraReceiver lora_receiver;
     ZmqSender zmq_sender(url);
     IHM ihm;
+    TempKeeper temp_keeper;
 
     std::map<std::string, std::string> errors = {
         {"tempLow",         "Temp too low"},
@@ -405,6 +440,7 @@ int main(int argc, const char *argv[])
 
         if (lora_receiver.recv(&temp) > 0)
         {
+            temp_keeper.add(temp);
             ihm.print_temp(temp);
             if(temp < TRIGGER_TEMP) { status = "tempLow"; }
         }
@@ -425,7 +461,7 @@ int main(int argc, const char *argv[])
             ihm.set_alarm_enabled(alarm_enabled);
         }
 
-        if (status == "ok") { ihm.stop_alarm(); }
+        if (status == "ok") { ihm.stop_alarm(temp_keeper.min_24h()); }
         else { ihm.start_alarm(errors[status]); }  
     }
 
