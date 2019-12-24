@@ -64,7 +64,7 @@ IHM::IHM(): m_alarm_enabled(false)
 IHM::~IHM()
 {
     std::cout << "Shutting down alarms" << std::endl;
-    stop_alarm();
+    stop_alarm(99);
     m_running = false;
     m_led_thread->join();
     digitalWrite(LED_GREEN, LOW);
@@ -357,8 +357,8 @@ void TempKeeper::add(float temp)
 {
     time_t now = time(0);
     struct tm * timeinfo = localtime(&now);
-    int approx_curr_pos = 60 * timeinfo.tm_hour + timeinfo.tm_min;
-    int curr_pos = approx_curr_pos % SIZE_TEMP_KEEPER;
+    int approx_curr_pos = 60 * timeinfo->tm_hour + timeinfo->tm_min;
+    int curr_pos = approx_curr_pos / PRECISION_KEEPER;
 
     // Erase old values
     int erase_pos = (curr_pos > 0) ? curr_pos - 1 : SIZE_TEMP_KEEPER - 1;

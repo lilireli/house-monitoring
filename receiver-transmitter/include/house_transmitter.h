@@ -41,7 +41,8 @@
 
 #define TRIGGER_TEMP        3     // in degrees
 #define WAITING_TIME_ALARM  3600  // in seconds
-#define SIZE_TEMP_KEEPER    24*15 // Keep per 15 minutes 24h of data
+#define SIZE_TEMP_KEEPER    24*4  // Keep per 15 minutes 24h of data
+#define PRECISION_KEEPER    15
 
 class InfoScreen
 {
