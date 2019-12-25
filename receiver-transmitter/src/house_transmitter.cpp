@@ -361,7 +361,7 @@ void TempKeeper::add(float temp)
     int curr_pos = approx_curr_pos / PRECISION_KEEPER;
 
     // Erase old values
-    int erase_pos = (curr_pos > 0) ? curr_pos - 1 : SIZE_TEMP_KEEPER - 1;
+    int erase_pos = (curr_pos < SIZE_TEMP_KEEPER - 1) ? curr_pos + 1 : 0;
     m_temp_24h[erase_pos] = 99;
 
     // Compare new one with running 15 min
