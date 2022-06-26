@@ -1,3 +1,5 @@
 build
 .vscode
 .Trash-*
+staticfiles
+__pycache__

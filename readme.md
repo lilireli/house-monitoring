@@ -47,3 +47,7 @@ virtualenv venv
 source venv/bin/activate
 pip install requirements.txt
 ```
+
+The application is currently running on Heroku
+- To run locally https://devcenter.heroku.com/articles/getting-started-with-python#run-the-app-locally
+- To deploy https://devcenter.heroku.com/articles/getting-started-with-python#deploy-the-app

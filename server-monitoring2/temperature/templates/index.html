@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+
+{% block content %}
+
+<!-- !PAGE CONTENT! -->
+<div class="w3-main">
+
+    <!-- Header -->
+    <header class="w3-container" style="padding-top:22px">
+        <h5><b><i class="fa fa-dashboard"></i> Mon tableau de bord</b></h5>
+    </header>
+
+    <div class="w3-row-padding w3-margin-bottom">
+        <div class="w3-threequarter" id="alert">
+            <div class="w3-container w3-padding-16" v-bind:class="color">
+                <div class="w3-left">
+                    <i class="fa w3-xxxlarge" v-bind:class="icon"></i>
+                </div>
+                <div class="w3-left w3-margin-left">
+                    <h4><b> {{ alertMsg }} </b></h4>
+                </div>
+            </div>
+        </div>
+        <div class="w3-quarter" id="buzzer">
+            <div class="w3-container w3-padding-16">
+                <div class="w3-right">
+                    <label class="switch">
+                        <input type="checkbox" @click='checkBuzzer()' v-model='isBuzzerActive'>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="w3-right w3-margin-right">
+                    <h4> {{ checkName }} </h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="w3-padding-16"></div>
+
+    <div class="w3-row-padding w3-margin-bottom" id="kpi-temp">
+        <div class="w3-third">
+            <div class="w3-container w3-teal w3-padding-16">
+                <div class="w3-left">
+                    <i class="fa fa-thermometer-half w3-xxxlarge"></i>
+                    <div class="w3-clear"></div>
+                    <h4>Température actuelle</h4>
+                </div>
+                <div class="w3-right">
+                    <h2> {{ currentTemp }} °C </h2>
+                </div>
+            </div>
+        </div>
+        <div class="w3-third">
+            <div class="w3-container w3-blue w3-padding-16">
+                <div class="w3-left">
+                    <i class="fa fa-thermometer-empty w3-xxxlarge"></i>
+                    <div class="w3-clear"></div>
+                    <h4>Température minimum (24h)</h4>
+                </div>
+                <div class="w3-right">
+                    <h2> {{ minTemp }} °C</h2>
+                </div>
+            </div>
+        </div>
+        <div class="w3-third">
+            <div class="w3-container w3-orange w3-text-white w3-padding-16">
+                <div class="w3-left">
+                    <i class="fa fa-thermometer-full  w3-xxxlarge"></i>
+                    <div class="w3-clear"></div>
+                    <h4>Température maximum (24h)</h4>
+                </div>
+                <div class="w3-right">
+                    <h2> {{ maxTemp }} °C</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <hr>
+    <div class="w3-container">
+        <canvas id="graphTemp" width="200" height="50"></canvas>
+    </div>
+    <hr>
+
+    <!-- Footer -->
+    <footer class="w3-container w3-padding-16 w3-light-grey">
+        <p>Powered by <a href="https://www.w3schools.com/w3css/default.asp" target="_blank">w3.css</a>,
+            <a href="https://vuejs.org/" target="_blank">vue.js</a>,
+            <a href="https://www.chartjs.org/" target="_blank">chart.js</a>
+        </p>
+    </footer>
+
+    <!-- End page content -->
+</div>
+
+{% load static %}
+<script type="text/javascript" src="{% static 'js/Chart.bundle.min.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script type="text/javascript" src="{% static 'js/render-vue.js' %}"></script>
+
+{% endblock content %}
