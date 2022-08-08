@@ -1,14 +1,8 @@
-from django.db import models
+from django.db.models import Model, DateTimeField, FloatField
 
-class TemperatureSerre(models.Model):
-    received_time = models.DateTimeField('date received')
-    temperature_celsius = models.FloatField()
+class TemperatureSerre(Model):
+    received_time = DateTimeField('date received')
+    temperature_celsius = FloatField()
 
-    def kpi_temp(self):
-        return self.received_time >= timezone.now() - datetime.timedelta(days=1)
-
-    def graph_temp(self):
-        return self.received_time >= timezone.now() - datetime.timedelta(days=1)
-
-    def alert(self):
-        return self.received_time >= timezone.now() - datetime.timedelta(days=1)
+    def add():
+        objects.create(received_time=datetime.datetime.now(), temperature_celsius=23.5)

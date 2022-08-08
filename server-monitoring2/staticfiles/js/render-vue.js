@@ -25,14 +25,14 @@ var kpiTemp = new Vue({
 });
 
 var graphTemp = new Vue({
-    el: 'graphTemp',
+    el: '#graphTemp',
     mounted() {
         var ctx = document.getElementById("graphTemp").getContext('2d');
         var temp_data = [];
 
         axios
             .get('/graph-temp')
-            .then(function (response) {                
+            .then(function (response) {
                 for (i = 0; i < response.data.temps.length; i++) {
                     temp_data.push(
                         {
@@ -102,7 +102,7 @@ var alert = new Vue({
             else {
                 alert = "";
 
-                switch (response.data.status){
+                switch (response.data.status) {
                     case "tempLow": alert = "La température dans la serre est trop basse"; break;
                     case "errArduino": alert = "Le capteur dans la serre ne fonctionne plus"; break;
                     case "errRaspberry": alert = "Le transmetteur de température ne fonctionne pas"; break;

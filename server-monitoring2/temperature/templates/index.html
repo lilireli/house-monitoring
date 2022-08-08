@@ -18,7 +18,7 @@
                     <i class="fa w3-xxxlarge" v-bind:class="icon"></i>
                 </div>
                 <div class="w3-left w3-margin-left">
-                    <h4><b> {{ alertMsg }} </b></h4>
+                    <h4><b> {% verbatim %}{{ alertMsg }}{% endverbatim %} </b></h4>
                 </div>
             </div>
         </div>
@@ -31,7 +31,7 @@
                     </label>
                 </div>
                 <div class="w3-right w3-margin-right">
-                    <h4> {{ checkName }} </h4>
+                    <h4> {% verbatim %}{{ checkName }}{% endverbatim %} </h4>
                 </div>
             </div>
         </div>
@@ -48,7 +48,7 @@
                     <h4>Température actuelle</h4>
                 </div>
                 <div class="w3-right">
-                    <h2> {{ currentTemp }} °C </h2>
+                    <h2> {% verbatim %}{{ currentTemp }}{% endverbatim %} °C </h2>
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
                     <h4>Température minimum (24h)</h4>
                 </div>
                 <div class="w3-right">
-                    <h2> {{ minTemp }} °C</h2>
+                    <h2> {% verbatim %}{{ minTemp }}{% endverbatim %} °C</h2>
                 </div>
             </div>
         </div>
@@ -72,7 +72,7 @@
                     <h4>Température maximum (24h)</h4>
                 </div>
                 <div class="w3-right">
-                    <h2> {{ maxTemp }} °C</h2>
+                    <h2> {% verbatim %}{{ maxTemp }}{% endverbatim %} °C</h2>
                 </div>
             </div>
         </div>
@@ -98,7 +98,7 @@
 
 {% load static %}
 <script type="text/javascript" src="{% static 'js/Chart.bundle.min.js' %}"></script>
-<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.8/dist/vue.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script type="text/javascript" src="{% static 'js/render-vue.js' %}"></script>
 
