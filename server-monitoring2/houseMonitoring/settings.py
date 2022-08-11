@@ -61,8 +61,6 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
 ROOT_URLCONF = 'houseMonitoring.urls'
 
 TEMPLATES = [
@@ -134,9 +132,10 @@ USE_TZ = False
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-   os.path.join(BASE_DIR, 'static')
+   os.path.join(BASE_DIR, 'on-se-capte-a-la-maison/static')
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
