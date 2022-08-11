@@ -15,7 +15,7 @@ class SensorCommunication(threading.Thread):
         logging.warning(f"Starting ZMQ thread on port {port}")
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)    
-        self.socket.bind(f"ws://*:{port}")
+        self.socket.bind(f"ws://0.0.0.0:{port}")
 
     def run(self):
         self.initialize_socket()
