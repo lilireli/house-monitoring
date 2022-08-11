@@ -15,16 +15,12 @@ class SensorCommunication(threading.Thread):
         logging.warning(f"Starting ZMQ thread on port {port}")
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)    
-        self.socket.bind(f"tcp://*:{port}")
+        self.socket.bind(f"ws://*:{port}")
 
     def run(self):
         self.initialize_socket()
 
         while 1:
-            while 1:
-                logging.warning("I'm still alive")
-                time.sleep(1)
-
             #  Wait for next request from client
             message = self.socket.recv()
             logging.warning("Received request: %s" % message)
