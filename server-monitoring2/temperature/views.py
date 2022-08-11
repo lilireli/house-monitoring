@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.db.models import Min, Max, Avg, DateTimeField
 from django.db.models.functions import TruncHour
+from django.views.decorators.csrf import csrf_exempt
 from temperature.models import TemperatureSerre
 import json
 import datetime
@@ -46,3 +47,12 @@ def alert(request):
 def buzzer(request):
     response = {"status": "enabled"}
     return  HttpResponse(json.dumps(response), content_type="application/json")
+
+@csrf_exempt 
+def add_temp(request):
+    if request.method == "POST":
+        # do something
+        logging.warning(request.method, request.body)
+    
+    response = {"status": "ok"}
+    return HttpResponse(json.dumps(response), content_type="application/json")

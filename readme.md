@@ -34,6 +34,18 @@ It contains:
 
 The code is done in C++.
 
+Installation is done with cmake (version depends on the server your using)
+
+```bash
+mkdir build
+cd build
+sudo apt-get install libboost-all-dev
+cmake ..
+make
+./house_transmitter --url http://localhost:5000/temp/add --auth-key 12345
+```
+
+
 ## Server Monitoring
 This is the webserver.
 

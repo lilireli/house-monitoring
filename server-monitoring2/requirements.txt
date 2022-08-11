@@ -1,6 +1,5 @@
 Django
 gunicorn
-pyzmq
 whitenoise
 dj-database-url
 psycopg2
