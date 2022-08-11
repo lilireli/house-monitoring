@@ -13,7 +13,7 @@ class SensorCommunication(threading.Thread):
         logging.info("Starting ZMQ thread")
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)    
-        self.socket.bind("tcp://*:5555")
+        self.socket.bind("tcp://*:6999")
 
     def run(self):
         self.initialize_socket()
