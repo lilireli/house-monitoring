@@ -274,11 +274,10 @@ int HttpSender::send_temperature(float temp, std::string status, bool* alarm_ena
         std::ostringstream body_stream;
 
         body_stream << std::setprecision(2) << std::fixed
-                    << "{"
-                    << "\"datetime\":\"" << datetime_str << "\","
-                    << "\"temperature\":" << temp << ","
-                    << "\"alarm_current\":\"" << status << "\","
-                    << "\"auth_key\":\"" << m_auth_key << "\""
+                    << "datetime=" << datetime_str << "&"
+                    << "temperature=" << temp << "&"
+                    << "alarm_current=" << status << "&"
+                    << "auth_key=" << m_auth_key
                     << "}";
 
         std::string body = body_stream.str();

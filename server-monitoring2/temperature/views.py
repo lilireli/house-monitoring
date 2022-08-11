@@ -52,7 +52,8 @@ def buzzer(request):
 def add_temp(request):
     if request.method == "POST":
         # do something
-        logging.warning(request.method, request.body)
+        logging.warning(request.method)
+        logging.warning(request.POST['datetime'])
     
     response = {"status": "ok"}
     return HttpResponse(json.dumps(response), content_type="application/json")

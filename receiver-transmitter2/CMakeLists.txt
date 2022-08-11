@@ -16,18 +16,18 @@ find_package(Threads REQUIRED)
 find_package(Boost 1.61.0 COMPONENTS system thread program_options REQUIRED)
 
 add_executable(house_transmitter 
-    # ${RADIOHEADBASE}/RHutil/RasPi.cpp
-    # ${RADIOHEADBASE}/RH_RF95.cpp
-    # ${RADIOHEADBASE}/RHDatagram.cpp
-    # ${RADIOHEADBASE}/RHHardwareSPI.cpp
-    # ${RADIOHEADBASE}/RHSPIDriver.cpp
-    # ${RADIOHEADBASE}/RHGenericDriver.cpp
-    # ${RADIOHEADBASE}/RHGenericSPI.cpp
-    # ${LIQUIDCRYSTALBASE}/src/LiquidCrystal.cpp
-    # ${LIQUIDCRYSTALBASE}/src/Print.cpp
+    ${RADIOHEADBASE}/RHutil/RasPi.cpp
+    ${RADIOHEADBASE}/RH_RF95.cpp
+    ${RADIOHEADBASE}/RHDatagram.cpp
+    ${RADIOHEADBASE}/RHHardwareSPI.cpp
+    ${RADIOHEADBASE}/RHSPIDriver.cpp
+    ${RADIOHEADBASE}/RHGenericDriver.cpp
+    ${RADIOHEADBASE}/RHGenericSPI.cpp
+    ${LIQUIDCRYSTALBASE}/src/LiquidCrystal.cpp
+    ${LIQUIDCRYSTALBASE}/src/Print.cpp
     src/house_transmitter.cpp)
 
 target_include_directories(house_transmitter PRIVATE ${Boost_INCLUDE_DIR})
 
-# target_link_libraries(house_transmitter bcm2835)
+target_link_libraries(house_transmitter bcm2835)
 target_link_libraries(house_transmitter ${Boost_LIBRARIES})
