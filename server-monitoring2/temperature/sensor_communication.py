@@ -11,7 +11,7 @@ class SensorCommunication(threading.Thread):
         threading.Thread.__init__(self)
 
     def initialize_socket(self):
-        port = 6999
+        port = 8000
         logging.warning(f"Starting ZMQ thread on port {port}")
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)    
