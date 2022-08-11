@@ -10,7 +10,7 @@ https://docs.djangoproject.com/en/4.0/howto/deployment/wsgi/
 import os
 
 from django.core.wsgi import get_wsgi_application
-from temperature.sensor_communication import SensorCommunication
+from temperature.sensor_communication import SensorCommunication, Sensor
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'houseMonitoring.settings')
 
@@ -18,3 +18,6 @@ application = get_wsgi_application()
 
 sensor = SensorCommunication()
 sensor.start()
+
+sensor2 = Sensor()
+sensor2.start()
