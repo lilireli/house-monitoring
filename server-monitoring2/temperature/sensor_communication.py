@@ -2,6 +2,7 @@ import zmq
 import threading
 
 import logging
+import time
 
 class SensorCommunication(threading.Thread):
     def __init__(self):
@@ -10,15 +11,20 @@ class SensorCommunication(threading.Thread):
         threading.Thread.__init__(self)
 
     def initialize_socket(self):
-        logging.warning("Starting ZMQ thread")
+        port = 6999
+        logging.warning(f"Starting ZMQ thread on port {port}")
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)    
-        self.socket.bind("tcp://*:6999")
+        self.socket.bind(f"tcp://*:{port}")
 
     def run(self):
         self.initialize_socket()
 
         while 1:
+            while 1:
+                logging.warning("I'm still alive")
+                time.sleep(1)
+
             #  Wait for next request from client
             message = self.socket.recv()
             logging.warning("Received request: %s" % message)
