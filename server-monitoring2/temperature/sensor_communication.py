@@ -16,12 +16,16 @@ class SensorCommunication(threading.Thread):
         self.socket.bind("tcp://*:6999")
 
     def run(self):
-        self.initialize_socket()
+        try:
+            self.initialize_socket()
 
-        while 1:
-            #  Wait for next request from client
-            message = self.socket.recv()
-            logging.warning("Received request: %s" % message)
+            while 1:
+                #  Wait for next request from client
+                message = self.socket.recv()
+                logging.warning("Received request: %s" % message)
 
-            #  Send reply back to client
-            self.socket.send(b"World")
+                #  Send reply back to client
+                self.socket.send(b"World")
+        
+        except zmq.error.ZMQError:
+            logging.warning("Could not start socket")
