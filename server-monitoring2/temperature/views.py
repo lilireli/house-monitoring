@@ -116,7 +116,7 @@ def add_temp(request):
                     logging.warning(f"Inserted new temperature {request.POST['temperature']} at {request.POST['datetime']}")
 
             else:
-                logging.warning(f"Authentication key not recognised {err}")
+                logging.warning(f"Authentication key not recognised")
 
         except Exception as err:
             logging.warning(f"Message badly formed as {err}")
