@@ -2,3 +2,4 @@ build
 .vscode
 .Trash-*
 __pycache__
+venv

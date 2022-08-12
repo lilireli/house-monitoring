@@ -8,4 +8,4 @@ git pull
 cd build
 make
 
-./house_transmitter --url https://localhost:5000/temp/add --auth-key 12345
+./house_transmitter --url http://localhost:5000/temp/add --auth-key 12345

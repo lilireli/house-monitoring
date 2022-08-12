@@ -22,10 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-if os.environ.get('ON_HEROKU', '0') == '0':
-    SECRET_KEY = 'django-insecure-f0kh2n!+m$fq5v_s(cj@pt&3r8ac2$w*tqj3f&ce&7p7%d)_(!'
-else:
-    SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-f0kh2n!+m$fq5v_s(cj@pt&3r8ac2$w*tqj3f&ce&7p7%d)_(!')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -143,3 +140,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
 MEDIA_URL = '/media/'
+
+# Specific to this webserver, only the Raspberry is allowed for POST requests
+AUTH_KEY = os.environ.get('AUTH_KEY', '12345')

@@ -16,7 +16,7 @@ namespace pt = boost::property_tree;
 namespace po = boost::program_options;
 
 //// Info Screen ////
-InfoScreen::InfoScreen(): m_lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7)
+InfoScreen::InfoScreen() : m_lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7)
 {
     m_lcd.begin(16, 2);
 }
@@ -38,11 +38,7 @@ void InfoScreen::print_line_two(std::string text)
 }
 
 //// IHM ////
-IHM::IHM(): m_alarm_enabled(false)
-          , m_running(true)
-          , m_alarm_running(false)
-          , m_noise_running(false)
-          , m_last_received(time(0))
+IHM::IHM() : m_alarm_enabled(false), m_running(true), m_alarm_running(false), m_noise_running(false), m_last_received(time(0))
 {
     // Initialize actuators
     pinMode(LED_GREEN, OUTPUT);
@@ -56,7 +52,7 @@ IHM::IHM(): m_alarm_enabled(false)
     m_info_screen.print_line_one("Hello");
     m_info_screen.print_line_two("");
 
-    m_led_thread = std::make_unique<std::thread>(std::thread([this]{
+    m_led_thread = std::make_unique<std::thread>(std::thread([this] {
         blink_led();
     }));
 }
@@ -79,10 +75,8 @@ void IHM::start_alarm(std::string error_msg)
 {
     m_alarm_running = true;
 
-    if (!m_noise_running && m_alarm_enabled 
-                         && error_msg != "No webserver" 
-                         && difftime(time(0), m_last_received) > WAITING_TIME_ALARM){
-        m_alarm_thread = std::make_unique<std::thread>(std::thread([this]{
+    if (!m_noise_running && m_alarm_enabled && error_msg != "No webserver" && difftime(time(0), m_last_received) > WAITING_TIME_ALARM) {
+        m_alarm_thread = std::make_unique<std::thread>(std::thread([this] {
             make_noise();
         }));
     }
@@ -94,8 +88,8 @@ void IHM::stop_alarm(float min_temp)
 {
     m_alarm_running = false;
     m_last_received = time(0);
- 
-    if (m_noise_running){
+
+    if (m_noise_running) {
         m_alarm_thread->join();
     }
 
@@ -108,7 +102,7 @@ int IHM::print_temp(float temp)
 {
     std::stringstream temp_stream;
     temp_stream << std::fixed << std::setprecision(1) << temp;
-    m_info_screen.print_line_one("temp:     " + temp_stream.str() + " C");    
+    m_info_screen.print_line_one("temp:     " + temp_stream.str() + " C");
 }
 
 void IHM::no_temp()
@@ -121,7 +115,7 @@ void IHM::set_alarm_enabled(bool enable)
     std::cout << "Alarm set to " << enable << std::endl;
     m_alarm_enabled = enable;
 
-    if (m_noise_running && !m_alarm_enabled){
+    if (m_noise_running && !m_alarm_enabled) {
         m_alarm_thread->join();
     }
 }
@@ -130,8 +124,7 @@ void IHM::make_noise()
 {
     m_noise_running = true;
 
-    while(m_alarm_running && m_alarm_enabled)
-    {
+    while (m_alarm_running && m_alarm_enabled) {
         digitalWrite(ALARM, HIGH);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         digitalWrite(ALARM, LOW);
@@ -145,10 +138,12 @@ void IHM::blink_led()
 {
     int current_led = LED_RED;
 
-    while(m_running)
-    {
-        if (m_alarm_running) { current_led = LED_RED; }
-        else { current_led = LED_GREEN; }
+    while (m_running) {
+        if (m_alarm_running) {
+            current_led = LED_RED;
+        } else {
+            current_led = LED_GREEN;
+        }
 
         digitalWrite(current_led, HIGH);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -158,17 +153,16 @@ void IHM::blink_led()
 }
 
 // LoRa Receiver ////
-LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN)
+LoraReceiver::LoraReceiver() : m_rf95(RF_CS_PIN)
 {
     // Initialize Pins
-    if (!bcm2835_init())
-    {
+    if (!bcm2835_init()) {
         throw std::string("bcm2835_init() Failed\n\n");
     }
 
     std::cout << "RF95 CS=GPIO%d" << RF_CS_PIN
-            << ", RST=GPIO%d" << RF_RST_PIN
-            << std::endl;
+              << ", RST=GPIO%d" << RF_RST_PIN
+              << std::endl;
 
     // Pulse a reset on module
     pinMode(RF_RST_PIN, OUTPUT);
@@ -177,11 +171,10 @@ LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN)
     digitalWrite(RF_RST_PIN, HIGH);
     bcm2835_delay(100);
 
-    if (!m_rf95.init())
-    {
+    if (!m_rf95.init()) {
         throw std::string("\nRF95 module init failed, Please verify wiring/module\n");
     }
-    
+
     // check your country max power useable, in EU it's +14dB
     m_rf95.setTxPower(14, false);
 
@@ -200,51 +193,48 @@ LoraReceiver::LoraReceiver(): m_rf95(RF_CS_PIN)
     m_rf95.setModeRx();
 
     std::cout << " OK NodeID=" << RF_NODE_ID << " @ "
-            << std::fixed << std::setw(3) << std::setprecision(2) 
-            << RF_FREQUENCY << "MHz\n" << std::endl;    
+              << std::fixed << std::setw(3) << std::setprecision(2)
+              << RF_FREQUENCY << "MHz\n"
+              << std::endl;
 }
 
-LoraReceiver::~LoraReceiver(){
+LoraReceiver::~LoraReceiver()
+{
     std::cout << "Closing Lora connection" << std::endl;
     bcm2835_close();
 }
 
-int LoraReceiver::recv(float* temp)
+int LoraReceiver::recv(float *temp)
 {
     // We allow a timeout before sending error
-    for(int i=0; i < 60; i++)
-    {
-        if (m_rf95.available())
-        {
+    for (int i = 0; i < 60; i++) {
+        if (m_rf95.available()) {
             // Should be a message for us now
             uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
             uint8_t len = sizeof(buf);
 
-            if (m_rf95.recv(buf, &len))
-            {
+            if (m_rf95.recv(buf, &len)) {
                 try {
                     std::cout << "Data: " << (char *)buf << std::endl;
 
                     // We need to remove unuseful characters at the end of the string
-                    std::string req_corrupt = std::string((char*)buf);
+                    std::string req_corrupt = std::string((char *)buf);
                     std::size_t req_corrupt_end = req_corrupt.find("}");
-                    
-                    if (req_corrupt_end == std::string::npos)
-                    {
+
+                    if (req_corrupt_end == std::string::npos) {
                         std::cout << "Received badly formatted message";
                         throw std::string("Badly formatted\n");
                     }
 
                     std::istringstream req(req_corrupt.substr(0, req_corrupt_end + 1));
                     pt::ptree root;
-                
+
                     pt::read_json(req, root);
                     // Not used yet -> std::string device = root.get<std::string>("id");
                     *temp = root.get<float>("temp");
 
                     return 1;
-                }
-                catch (...) {
+                } catch (...) {
                     std::cout << "No temperature received from sensor" << std::endl;
                 }
             }
@@ -253,22 +243,44 @@ int LoraReceiver::recv(float* temp)
         // wait one more sec to have result
         bcm2835_delay(1000);
     }
-    
+
     // Alert no data received after one minute
     std::cout << "No temperature received from sensor" << std::endl;
     return -1;
 }
 
 //// HTTP Sender ////
-int HttpSender::send_temperature(float temp, std::string status, bool* alarm_enabled)
+int HttpSender::add_new_value(float temp, std::string status, bool *alarm_enabled)
 {
-    try
-    {
+    time_t now = time(0);
+    int hasFailed = 0;
+
+    if (m_curr_bucket == 0) {
+        m_curr_bucket = now;
+    }
+
+    if (difftime(now, m_curr_bucket) > DB_INSERT_INTERVAL) {
+        std::cout << "Sending data\n";
+        float average = std::accumulate(m_temps.begin(), m_temps.end(), 0.0) / m_temps.size();
+
+        hasFailed = send_temperature(m_curr_bucket, average, status, alarm_enabled);
+
+        m_curr_bucket = now;
+        m_temps.clear();
+    }
+
+    m_temps.push_back(temp);
+
+    return hasFailed;
+}
+
+int HttpSender::send_temperature(time_t datetime, float temp, std::string status, bool *alarm_enabled)
+{
+    try {
         // check datetime
-        time_t now = time(0);
-        struct tm * timeinfo = localtime(&now);
+        struct tm *timeinfo = localtime(&datetime);
         char datetime_str[30];
-        strftime(datetime_str,30,"%Y-%m-%dT%H:%M:%S",timeinfo);
+        strftime(datetime_str, 30, "%Y-%m-%dT%H:%M:%S", timeinfo);
 
         // create message
         std::ostringstream body_stream;
@@ -277,58 +289,46 @@ int HttpSender::send_temperature(float temp, std::string status, bool* alarm_ena
                     << "datetime=" << datetime_str << "&"
                     << "temperature=" << temp << "&"
                     << "alarm_current=" << status << "&"
-                    << "auth_key=" << m_auth_key
-                    << "}";
+                    << "auth_key=" << m_auth_key;
 
         std::string body = body_stream.str();
 
         // send it
         http::Request request{m_url};
-        
-        const auto response = request.send("POST", body, {
-            {"Content-Type", "application/x-www-form-urlencoded"}
-        });
 
-        std::string result_str = std::string{response.body.begin(), response.body.end()};
+        const auto response = request.send("POST", body, {{"Content-Type", "application/x-www-form-urlencoded"}});
 
-        int result = 1;
-    
-        std::cout << "Received from webserver: " << result_str << '\n';
+        std::string result = std::string{response.body.begin(), response.body.end()};
 
-        if (result <= 0)
-        {
-            std::cout << "Webserver is down" << std::endl;
-            return -1;
+        std::cout << "Received from webserver: " << result << '\n';
+
+        if (result == "{\"alarm\": \"on\"}") {
+            std::cout << "Alarm enabled\n";
+            *alarm_enabled = true;
+        } else {
+            std::cout << "Alarm disabled\n";
+            *alarm_enabled = false;
         }
 
-        if (result > 0)
-        {
-            *alarm_enabled = result;
-        }
-        
-        return result;
-
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cerr << "Request failed, error: " << e.what() << '\n';
-        return -1;
+        return 1;
     }
 
     return 0;
-   
 }
 
-TempKeeper::TempKeeper() 
+TempKeeper::TempKeeper()
 {
-    for (int i = 0; i < SIZE_TEMP_KEEPER; i++)
-    {
+    for (int i = 0; i < SIZE_TEMP_KEEPER; i++) {
         m_temp_24h.push_back(99);
     }
 }
 
-void TempKeeper::add(float temp) 
+void TempKeeper::add(float temp)
 {
     time_t now = time(0);
-    struct tm * timeinfo = localtime(&now);
+    struct tm *timeinfo = localtime(&now);
     int approx_curr_pos = 60 * timeinfo->tm_hour + timeinfo->tm_min;
     int curr_pos = approx_curr_pos / PRECISION_KEEPER;
 
@@ -337,13 +337,12 @@ void TempKeeper::add(float temp)
     m_temp_24h[erase_pos] = 99;
 
     // Compare new one with running 15 min
-    if (m_temp_24h[curr_pos] > temp)
-    {
+    if (m_temp_24h[curr_pos] > temp) {
         m_temp_24h[curr_pos] = temp;
     }
 }
 
-float TempKeeper::min_24h() 
+float TempKeeper::min_24h()
 {
     auto min = std::min_element(m_temp_24h.begin(), m_temp_24h.end());
     return *min;
@@ -365,15 +364,11 @@ int main(int argc, const char *argv[])
     std::string url, auth_key;
 
     po::options_description desc("Transmitter for house-monitoring project");
-    desc.add_options()
-        ("help,h", "produce help message")
-        ("url", po::value<std::string>(), "defines to which url send the data")
-        ("auth-key", po::value<std::string>(), "defines the key to authenticate to the server")
-    ;
+    desc.add_options()("help,h", "produce help message")("url", po::value<std::string>(), "defines to which url send the data")("auth-key", po::value<std::string>(), "defines the key to authenticate to the server");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);    
+    po::notify(vm);
 
     if (vm.count("help")) {
         std::cout << desc << std::endl;
@@ -406,41 +401,42 @@ int main(int argc, const char *argv[])
     TempKeeper temp_keeper;
 
     std::map<std::string, std::string> errors = {
-        {"tempLow",         "Temp too low"},
-        {"errArduino",      "No temp received" },
-        {"errWebserver",    "No webserver" }
-    };
+        {"tempLow", "Temp too low"},
+        {"errArduino", "No temp received"},
+        {"errWebserver", "No webserver"}};
 
-    while (!force_exit)
-    {
+    while (!force_exit) {
         float temp = 99;
         bool alarm_enabled = ihm.get_alarm_enabled();
         std::string status = "ok";
         std::string print_status = "";
 
-        if (lora_receiver.recv(&temp) > 0)
-        {
+        if (lora_receiver.recv(&temp) > 0) {
             temp_keeper.add(temp);
             ihm.print_temp(temp);
-            if(temp < TRIGGER_TEMP) { status = "tempLow"; }
-        }
-        else
-        {
+            if (temp < TRIGGER_TEMP) {
+                status = "tempLow";
+            }
+        } else {
             ihm.no_temp();
             status = "errArduino";
         }
 
-        if (http_sender.send_temperature(temp, status, &alarm_enabled) <= 0) { 
-            if (status == "ok") { status = "errWebserver"; }
+        if (http_sender.add_new_value(temp, status, &alarm_enabled) > 0) {
+            if (status == "ok") {
+                status = "errWebserver";
+            }
         }
 
-        if (ihm.get_alarm_enabled() != alarm_enabled)
-        {
+        if (ihm.get_alarm_enabled() != alarm_enabled) {
             ihm.set_alarm_enabled(alarm_enabled);
         }
 
-        if (status == "ok") { ihm.stop_alarm(temp_keeper.min_24h()); }
-        else { ihm.start_alarm(errors[status]); }  
+        if (status == "ok") {
+            ihm.stop_alarm(temp_keeper.min_24h());
+        } else {
+            ihm.start_alarm(errors[status]);
+        }
     }
 
     return 0;

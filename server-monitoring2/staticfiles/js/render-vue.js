@@ -10,9 +10,9 @@ var kpiTemp = new Vue({
             axios
                 .get('/kpi-temp')
                 .then(response => (
-                    this.currentTemp = parseInt(response.data.currentTemp) != -99 ? response.data.currentTemp : 'NA',
-                    this.minTemp = parseInt(response.data.minTemp) != -99 ? response.data.minTemp : 'NA',
-                    this.maxTemp = parseInt(response.data.maxTemp) != -99 ? response.data.maxTemp : 'NA'
+                    this.currentTemp = response.data.currentTemp ? response.data.currentTemp : 'NA',
+                    this.minTemp = response.data.minTemp ? response.data.minTemp : 'NA',
+                    this.maxTemp = response.data.maxTemp ? response.data.maxTemp : 'NA'
                 ))
         }
     },
@@ -138,7 +138,7 @@ var buzzer = new Vue({
     },
     methods: {
         interpret: function (response) {
-            if (response.data.status == "activated") {
+            if (response.data.status == "on") {
                 this.checkName = 'Buzzer activé';
                 this.isBuzzerActive = true;
             }
