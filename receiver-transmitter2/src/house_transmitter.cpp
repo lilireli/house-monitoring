@@ -49,7 +49,7 @@ IHM::IHM() : m_alarm_enabled(false), m_running(true), m_alarm_running(false), m_
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
 
-    m_info_screen.print_line_one("Hello");
+    m_info_screen.print_line_one("Hello v3");
     m_info_screen.print_line_two("");
 
     m_led_thread = std::make_unique<std::thread>(std::thread([this] {
