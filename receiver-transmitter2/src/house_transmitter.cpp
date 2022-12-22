@@ -67,8 +67,8 @@ IHM::~IHM()
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
 
-    m_info_screen.print_line_one("Program not");
-    m_info_screen.print_line_two("running");
+    m_info_screen.print_line_one("v3: Program");
+    m_info_screen.print_line_two("initialize");
 }
 
 void IHM::start_alarm(std::string error_msg)
@@ -375,19 +375,20 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    if (vm.count("url")) {
-        url = vm["url"].as<std::string>();
-    } else {
-        std::cout << "No url was provided." << std::endl;
-        return 1;
-    }
+    // Deactivate server as long as no option found
+    // if (vm.count("url")) {
+    //     url = vm["url"].as<std::string>();
+    // } else {
+    //     std::cout << "No url was provided." << std::endl;
+    //     return 1;
+    // }
 
-    if (vm.count("auth-key")) {
-        auth_key = vm["auth-key"].as<std::string>();
-    } else {
-        std::cout << "No auth-key was provided." << std::endl;
-        return 1;
-    }
+    // if (vm.count("auth-key")) {
+    //     auth_key = vm["auth-key"].as<std::string>();
+    // } else {
+    //     std::cout << "No auth-key was provided." << std::endl;
+    //     return 1;
+    // }
 
     // * Main program *
     std::cout << "Starting program" << std::endl;
@@ -396,7 +397,7 @@ int main(int argc, const char *argv[])
     signal(SIGINT, sig_handler);
 
     LoraReceiver lora_receiver;
-    HttpSender http_sender(url, auth_key);
+    // HttpSender http_sender(url, auth_key);
     IHM ihm;
     TempKeeper temp_keeper;
 
@@ -422,21 +423,21 @@ int main(int argc, const char *argv[])
             status = "errArduino";
         }
 
-        if (http_sender.add_new_value(temp, status, &alarm_enabled) > 0) {
-            if (status == "ok") {
-                status = "errWebserver";
-            }
-        }
+        // if (http_sender.add_new_value(temp, status, &alarm_enabled) > 0) {
+        //     if (status == "ok") {
+        //         status = "errWebserver";
+        //     }
+        // }
 
-        if (ihm.get_alarm_enabled() != alarm_enabled) {
-            ihm.set_alarm_enabled(alarm_enabled);
-        }
+        // if (ihm.get_alarm_enabled() != alarm_enabled) {
+        //     ihm.set_alarm_enabled(alarm_enabled);
+        // }
 
-        if (status == "ok") {
-            ihm.stop_alarm(temp_keeper.min_24h());
-        } else {
-            ihm.start_alarm(errors[status]);
-        }
+        // if (status == "ok") {
+        //     ihm.stop_alarm(temp_keeper.min_24h());
+        // } else {
+        //     ihm.start_alarm(errors[status]);
+        // }
     }
 
     return 0;
