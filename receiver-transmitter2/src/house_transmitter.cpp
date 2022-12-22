@@ -49,8 +49,8 @@ IHM::IHM() : m_alarm_enabled(false), m_running(true), m_alarm_running(false), m_
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
 
-    m_info_screen.print_line_one("Hello v3");
-    m_info_screen.print_line_two("");
+    m_info_screen.print_line_one("Hello");
+    m_info_screen.print_line_two("v3");
 
     m_led_thread = std::make_unique<std::thread>(std::thread([this] {
         blink_led();
@@ -67,8 +67,8 @@ IHM::~IHM()
     digitalWrite(LED_RED, LOW);
     digitalWrite(ALARM, LOW);
 
-    m_info_screen.print_line_one("v3: Program");
-    m_info_screen.print_line_two("initialize");
+    m_info_screen.print_line_one("Program not");
+    m_info_screen.print_line_two("running");
 }
 
 void IHM::start_alarm(std::string error_msg)
